@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Calendar, Briefcase, Users, Bell, LogOut, Plus } from "lucide-react";
+import { Calendar, Briefcase, Users, Bell, LogOut, Plus, UserCircle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +20,14 @@ const AdminDashboard = () => {
   const [events, setEvents] = useState<any[]>([]);
   const [clubs, setClubs] = useState<any[]>([]);
   const [placements, setPlacements] = useState<any[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
+  const [filteredStudents, setFilteredStudents] = useState<any[]>([]);
+  const [filters, setFilters] = useState({
+    year: "all",
+    semester: "all",
+    branch: "all",
+    section: "all"
+  });
 
   useEffect(() => {
     checkAuth();
@@ -72,6 +82,41 @@ const AdminDashboard = () => {
       .order('created_at', { ascending: false });
     
     setPlacements(placementsData || []);
+
+    // Fetch students
+    const { data: studentsData } = await supabase
+      .from('students')
+      .select('*')
+      .order('year', { ascending: true })
+      .order('semester', { ascending: true })
+      .order('branch', { ascending: true })
+      .order('section', { ascending: true });
+    
+    setStudents(studentsData || []);
+    setFilteredStudents(studentsData || []);
+  };
+
+  useEffect(() => {
+    applyFilters();
+  }, [filters, students]);
+
+  const applyFilters = () => {
+    let filtered = students;
+
+    if (filters.year !== "all") {
+      filtered = filtered.filter(s => s.year === parseInt(filters.year));
+    }
+    if (filters.semester !== "all") {
+      filtered = filtered.filter(s => s.semester === parseInt(filters.semester));
+    }
+    if (filters.branch !== "all") {
+      filtered = filtered.filter(s => s.branch === filters.branch);
+    }
+    if (filters.section !== "all") {
+      filtered = filtered.filter(s => s.section === filters.section);
+    }
+
+    setFilteredStudents(filtered);
   };
 
   const handleCreateEvent = async (formData: any) => {
@@ -171,7 +216,7 @@ const AdminDashboard = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="events" className="space-y-6">
-          <TabsList className="grid w-full max-w-2xl mx-auto grid-cols-4">
+          <TabsList className="grid w-full max-w-3xl mx-auto grid-cols-5">
             <TabsTrigger value="events">
               <Calendar className="h-4 w-4 mr-2" />
               Events
@@ -183,6 +228,10 @@ const AdminDashboard = () => {
             <TabsTrigger value="placements">
               <Briefcase className="h-4 w-4 mr-2" />
               Placements
+            </TabsTrigger>
+            <TabsTrigger value="students">
+              <UserCircle className="h-4 w-4 mr-2" />
+              Students
             </TabsTrigger>
             <TabsTrigger value="announcements">
               <Bell className="h-4 w-4 mr-2" />
@@ -252,6 +301,125 @@ const AdminDashboard = () => {
                 </Card>
               ))}
             </div>
+          </TabsContent>
+
+          {/* Students Tab */}
+          <TabsContent value="students" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">View Students</h2>
+              <span className="text-sm text-muted-foreground">Total: {filteredStudents.length} students</span>
+            </div>
+            
+            {/* Filters */}
+            <Card className="p-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label>Year</Label>
+                  <Select value={filters.year} onValueChange={(value) => setFilters({ ...filters, year: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Years" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Years</SelectItem>
+                      <SelectItem value="1">1st Year</SelectItem>
+                      <SelectItem value="2">2nd Year</SelectItem>
+                      <SelectItem value="3">3rd Year</SelectItem>
+                      <SelectItem value="4">4th Year</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Semester</Label>
+                  <Select value={filters.semester} onValueChange={(value) => setFilters({ ...filters, semester: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Semesters" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Semesters</SelectItem>
+                      <SelectItem value="2">2nd Semester</SelectItem>
+                      <SelectItem value="4">4th Semester</SelectItem>
+                      <SelectItem value="6">6th Semester</SelectItem>
+                      <SelectItem value="8">8th Semester</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Branch</Label>
+                  <Select value={filters.branch} onValueChange={(value) => setFilters({ ...filters, branch: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Branches" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Branches</SelectItem>
+                      <SelectItem value="CSE">CSE</SelectItem>
+                      <SelectItem value="AIML">AIML</SelectItem>
+                      <SelectItem value="IOT">IOT</SelectItem>
+                      <SelectItem value="CIVIL">CIVIL</SelectItem>
+                      <SelectItem value="MECHANICAL">MECHANICAL</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Section</Label>
+                  <Select value={filters.section} onValueChange={(value) => setFilters({ ...filters, section: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Sections" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Sections</SelectItem>
+                      <SelectItem value="A1">A1</SelectItem>
+                      <SelectItem value="A2">A2</SelectItem>
+                      <SelectItem value="A3">A3</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </Card>
+
+            {/* Students Table */}
+            <Card>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Year</TableHead>
+                      <TableHead>Semester</TableHead>
+                      <TableHead>Branch</TableHead>
+                      <TableHead>Section</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>DOB</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredStudents.length > 0 ? (
+                      filteredStudents.map((student) => (
+                        <TableRow key={student.id}>
+                          <TableCell className="font-medium">{student.full_name}</TableCell>
+                          <TableCell>{student.email}</TableCell>
+                          <TableCell>{student.year}</TableCell>
+                          <TableCell>{student.semester}</TableCell>
+                          <TableCell>{student.branch}</TableCell>
+                          <TableCell>{student.section}</TableCell>
+                          <TableCell>{student.phone_number}</TableCell>
+                          <TableCell>{new Date(student.date_of_birth).toLocaleDateString()}</TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center text-muted-foreground">
+                          No students found matching the filters
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </Card>
           </TabsContent>
 
           {/* Announcements Tab */}
