@@ -22,6 +22,7 @@ const AdminDashboard = () => {
   const [placements, setPlacements] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<any[]>([]);
+  const [eventAttendance, setEventAttendance] = useState<Record<string, number>>({});
   const [filters, setFilters] = useState({
     year: "all",
     semester: "all",
@@ -66,6 +67,19 @@ const AdminDashboard = () => {
       .order('date_time', { ascending: false });
     
     setEvents(eventsData || []);
+
+    // Fetch event attendance counts
+    if (eventsData) {
+      const attendanceCounts: Record<string, number> = {};
+      for (const event of eventsData) {
+        const { count } = await supabase
+          .from('event_attendance')
+          .select('*', { count: 'exact', head: true })
+          .eq('event_id', event.id);
+        attendanceCounts[event.id] = count || 0;
+      }
+      setEventAttendance(attendanceCounts);
+    }
 
     // Fetch clubs
     const { data: clubsData } = await supabase
@@ -255,7 +269,11 @@ const AdminDashboard = () => {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm text-muted-foreground">{event.description}</p>
+                    <p className="text-sm text-muted-foreground mb-3">{event.description}</p>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Users className="h-4 w-4 text-primary" />
+                      <span className="font-medium">{eventAttendance[event.id] || 0} students joined</span>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
