@@ -354,8 +354,9 @@ const AdminDashboard = () => {
                     <SelectContent>
                       <SelectItem value="all">All Branches</SelectItem>
                       <SelectItem value="CSE">CSE</SelectItem>
-                      <SelectItem value="AIML">AIML</SelectItem>
+                      <SelectItem value="IT">IT</SelectItem>
                       <SelectItem value="IOT">IOT</SelectItem>
+                      <SelectItem value="CHEMICAL">CHEMICAL</SelectItem>
                       <SelectItem value="CIVIL">CIVIL</SelectItem>
                       <SelectItem value="MECHANICAL">MECHANICAL</SelectItem>
                     </SelectContent>
