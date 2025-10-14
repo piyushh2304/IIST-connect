@@ -41,6 +41,35 @@ export type Database = {
         }
         Relationships: []
       }
+      club_memberships: {
+        Row: {
+          club_id: string
+          id: string
+          joined_at: string
+          user_id: string
+        }
+        Insert: {
+          club_id: string
+          id?: string
+          joined_at?: string
+          user_id: string
+        }
+        Update: {
+          club_id?: string
+          id?: string
+          joined_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_memberships_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clubs: {
         Row: {
           created_at: string
@@ -90,6 +119,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "event_attendance_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_ratings: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          rating: number
+          review: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          rating: number
+          review?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          rating?: number
+          review?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_ratings_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "events"
@@ -183,6 +250,7 @@ export type Database = {
           email: string
           id: string
           name: string
+          preferences: Json | null
           role: string
           section: string | null
           semester: number | null
@@ -195,6 +263,7 @@ export type Database = {
           email: string
           id: string
           name: string
+          preferences?: Json | null
           role: string
           section?: string | null
           semester?: number | null
@@ -207,6 +276,7 @@ export type Database = {
           email?: string
           id?: string
           name?: string
+          preferences?: Json | null
           role?: string
           section?: string | null
           semester?: number | null
