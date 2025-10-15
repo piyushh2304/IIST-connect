@@ -5,13 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Calendar, Briefcase, Users, Bell, LogOut, Plus, UserCircle } from "lucide-react";
+import { Calendar, Briefcase, Users, Bell, LogOut, Plus, UserCircle, BarChart3, Wrench } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { AnalyticsDashboard } from "@/components/admin/AnalyticsDashboard";
+import { BulkStudentImport } from "@/components/admin/BulkStudentImport";
+import { EventQRCode } from "@/components/admin/EventQRCode";
+import { ReportsGeneration } from "@/components/admin/ReportsGeneration";
+import { EventTemplates } from "@/components/admin/EventTemplates";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -229,8 +234,12 @@ const AdminDashboard = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        <Tabs defaultValue="events" className="space-y-6">
-          <TabsList className="grid w-full max-w-3xl mx-auto grid-cols-5">
+        <Tabs defaultValue="analytics" className="space-y-6">
+          <TabsList className="grid w-full max-w-5xl mx-auto grid-cols-7 gap-1">
+            <TabsTrigger value="analytics">
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Analytics
+            </TabsTrigger>
             <TabsTrigger value="events">
               <Calendar className="h-4 w-4 mr-2" />
               Events
@@ -249,9 +258,18 @@ const AdminDashboard = () => {
             </TabsTrigger>
             <TabsTrigger value="announcements">
               <Bell className="h-4 w-4 mr-2" />
-              Announcements
+              Announce
+            </TabsTrigger>
+            <TabsTrigger value="tools">
+              <Wrench className="h-4 w-4 mr-2" />
+              Tools
             </TabsTrigger>
           </TabsList>
+
+          {/* Analytics Tab */}
+          <TabsContent value="analytics">
+            <AnalyticsDashboard />
+          </TabsContent>
 
           {/* Events Tab */}
           <TabsContent value="events" className="space-y-4">
@@ -259,6 +277,12 @@ const AdminDashboard = () => {
               <h2 className="text-2xl font-bold">Manage Events</h2>
               <CreateEventDialog clubs={clubs} onCreate={handleCreateEvent} />
             </div>
+            
+            <EventTemplates onApplyTemplate={(template) => {
+              // Apply template logic would go in CreateEventDialog
+              toast.info("Template applied! Open Create Event to use it.");
+            }} />
+
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {events.map((event) => (
                 <Card key={event.id} className="hover:shadow-lg transition-all duration-300">
@@ -268,11 +292,22 @@ const AdminDashboard = () => {
                       {event.clubs?.name} • {new Date(event.date_time).toLocaleDateString()}
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground mb-3">{event.description}</p>
+                  <CardContent className="space-y-3">
+                    <p className="text-sm text-muted-foreground">{event.description}</p>
                     <div className="flex items-center gap-2 text-sm">
                       <Users className="h-4 w-4 text-primary" />
                       <span className="font-medium">{eventAttendance[event.id] || 0} students joined</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <EventQRCode event={event} />
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => sendEventNotification(event)}
+                      >
+                        <Bell className="h-4 w-4 mr-2" />
+                        Notify
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -448,10 +483,36 @@ const AdminDashboard = () => {
               <CreateAnnouncementDialog onCreate={handleCreateAnnouncement} />
             </div>
           </TabsContent>
+
+          {/* Tools Tab */}
+          <TabsContent value="tools" className="space-y-6">
+            <h2 className="text-2xl font-bold mb-4">Admin Tools</h2>
+            <BulkStudentImport onImportComplete={fetchData} />
+            <ReportsGeneration />
+          </TabsContent>
         </Tabs>
       </main>
     </div>
   );
+};
+
+const sendEventNotification = async (event: any) => {
+  try {
+    const { data, error } = await supabase.functions.invoke('send-event-notification', {
+      body: {
+        eventId: event.id,
+        eventTitle: event.title,
+        eventDate: event.date_time,
+        eventLocation: event.location,
+        targetRole: 'student'
+      }
+    });
+
+    if (error) throw error;
+    toast.success(`Notifications sent to ${data.notifiedUsers} users`);
+  } catch (error: any) {
+    toast.error(`Failed to send notifications: ${error.message}`);
+  }
 };
 
 // Create Event Dialog Component

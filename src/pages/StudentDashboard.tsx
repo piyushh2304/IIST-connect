@@ -6,11 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Calendar, Briefcase, Users, Bell, LogOut, User, Menu, X, Star, Heart, HeartOff } from "lucide-react";
+import { Calendar as CalendarIcon, Briefcase, Users, Bell, LogOut, User, Menu, X, Star, Heart, HeartOff } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import SearchFilters from "@/components/SearchFilters";
 import EventRating from "@/components/EventRating";
+import { NotificationCenter } from "@/components/NotificationCenter";
+import { EventCalendar } from "@/components/EventCalendar";
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
@@ -318,6 +320,7 @@ const StudentDashboard = () => {
             </h1>
           </div>
           <div className="hidden md:flex items-center gap-4">
+            <NotificationCenter />
             <div className="flex items-center gap-3">
               <Avatar>
                 <AvatarImage src={profile?.avatar_url} />
@@ -345,9 +348,13 @@ const StudentDashboard = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="events" className="space-y-6">
-          <TabsList className="grid w-full max-w-2xl mx-auto grid-cols-4 h-auto p-1">
+          <TabsList className="grid w-full max-w-3xl mx-auto grid-cols-5 h-auto p-1">
+            <TabsTrigger value="calendar" className="flex flex-col items-center gap-1 py-2">
+              <CalendarIcon className="h-4 w-4" />
+              <span className="text-xs">Calendar</span>
+            </TabsTrigger>
             <TabsTrigger value="events" className="flex flex-col items-center gap-1 py-2">
-              <Calendar className="h-4 w-4" />
+              <CalendarIcon className="h-4 w-4" />
               <span className="text-xs">Events</span>
             </TabsTrigger>
             <TabsTrigger value="clubs" className="flex flex-col items-center gap-1 py-2">
@@ -365,6 +372,11 @@ const StudentDashboard = () => {
               <span className="text-xs">Announcements</span>
             </TabsTrigger>
           </TabsList>
+
+          {/* Calendar Tab */}
+          <TabsContent value="calendar">
+            <EventCalendar />
+          </TabsContent>
 
           {/* Events Tab */}
           <TabsContent value="events" className="space-y-4">
