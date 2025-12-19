@@ -19,7 +19,12 @@ const StudentAuth = () => {
     collegeId: "",
     semester: "",
     branch: "",
-    section: ""
+    section: "",
+    phoneNumber: "",
+    section: "",
+    phoneNumber: "",
+    dateOfBirth: "",
+    year: ""
   });
   
   const navigate = useNavigate();
@@ -52,6 +57,8 @@ const StudentAuth = () => {
         toast.success("Welcome back!");
         navigate("/student/dashboard");
       } else {
+        // const year = Math.ceil(parseInt(formData.semester) / 2); (removed)
+
         const { data, error } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
@@ -61,8 +68,11 @@ const StudentAuth = () => {
               role: 'student',
               college_id: formData.collegeId,
               semester: parseInt(formData.semester),
+              year: parseInt(formData.year),
               branch: formData.branch,
-              section: formData.section
+              section: formData.section,
+              phone_number: formData.phoneNumber,
+              date_of_birth: formData.dateOfBirth
             },
             emailRedirectTo: `${window.location.origin}/student/dashboard`
           }
@@ -82,7 +92,7 @@ const StudentAuth = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-secondary/20 to-accent/30 p-4">
-      <Card className="w-full max-w-md shadow-lg animate-fade-in">
+      <Card className="w-full max-w-md shadow-lg animate-fade-in my-8">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
             <div className="p-3 bg-primary/10 rounded-full">
@@ -141,6 +151,27 @@ const StudentAuth = () => {
                     </Select>
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="year">Year</Label>
+                    <Select
+                      value={formData.year}
+                      onValueChange={(value) => setFormData({ ...formData, year: value })}
+                      required={!isLogin}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 2, 3, 4].map((year) => (
+                          <SelectItem key={year} value={year.toString()}>
+                            {year}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
                     <Label htmlFor="section">Section</Label>
                     <Input
                       id="section"
@@ -151,26 +182,48 @@ const StudentAuth = () => {
                       required={!isLogin}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="branch">Branch</Label>
+                    <Select
+                      value={formData.branch}
+                      onValueChange={(value) => setFormData({ ...formData, branch: value })}
+                      required={!isLogin}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Branch" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="CSE">Computer Science</SelectItem>
+                        <SelectItem value="IT">Information Technology</SelectItem>
+                        <SelectItem value="ECE">Electronics & Communication</SelectItem>
+                        <SelectItem value="EEE">Electrical & Electronics</SelectItem>
+                        <SelectItem value="MECH">Mechanical</SelectItem>
+                        <SelectItem value="CIVIL">Civil</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="branch">Branch</Label>
-                  <Select
-                    value={formData.branch}
-                    onValueChange={(value) => setFormData({ ...formData, branch: value })}
-                    required={!isLogin}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select Branch" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="CSE">Computer Science</SelectItem>
-                      <SelectItem value="IT">Information Technology</SelectItem>
-                      <SelectItem value="ECE">Electronics & Communication</SelectItem>
-                      <SelectItem value="EEE">Electrical & Electronics</SelectItem>
-                      <SelectItem value="MECH">Mechanical</SelectItem>
-                      <SelectItem value="CIVIL">Civil</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <Label htmlFor="phone">Phone Number</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="+91 9876543210"
+                      value={formData.phoneNumber}
+                      onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                      required={!isLogin}
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="dob">Date of Birth</Label>
+                    <Input
+                      id="dob"
+                      type="date"
+                      value={formData.dateOfBirth}
+                      onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                      required={!isLogin}
+                      max={new Date().toISOString().split('T')[0]}
+                    />
                 </div>
               </>
             )}

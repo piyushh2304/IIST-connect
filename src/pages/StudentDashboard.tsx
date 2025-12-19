@@ -13,6 +13,8 @@ import SearchFilters from "@/components/SearchFilters";
 import EventRating from "@/components/EventRating";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { EventCalendar } from "@/components/EventCalendar";
+import { NotesViewer } from "@/components/student/NotesViewer";
+import { BookOpen } from "lucide-react";
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
@@ -29,124 +31,199 @@ const StudentDashboard = () => {
   const [filterType, setFilterType] = useState("all");
   const [sortBy, setSortBy] = useState("date-desc");
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [joinedEventIds, setJoinedEventIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    checkAuth();
-    fetchData();
+    let mounted = true;
+
+    const initializeAuth = async () => {
+      // Safety timeout
+      const timeoutId = setTimeout(() => {
+        if (mounted) {
+          console.warn("Auth check timed out");
+          setLoading(false);
+        }
+      }, 8000);
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          console.log("No session found in getSession");
+          if (mounted) navigate("/student/auth");
+          clearTimeout(timeoutId);
+          return;
+        }
+
+        // Verify profile
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profileError) console.error("Profile fetch error:", profileError);
+
+        if (!profileData || profileData.role !== 'student') {
+          console.warn("Invalid profile or role:", profileData);
+          await supabase.auth.signOut();
+          if (mounted) navigate("/student/auth");
+          clearTimeout(timeoutId);
+          return;
+        }
+
+        if (mounted) {
+          setProfile(profileData);
+          await fetchData(session.user.id); // Await fetchData ensuring we clear timeout after IT finishes
+        }
+      } catch (error) {
+        console.error("Auth initialization error:", error);
+        if (mounted) navigate("/student/auth");
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    };
+
+    initializeAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth event:", event);
+      if (event === 'SIGNED_OUT') {
+        if (mounted) navigate("/student/auth");
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const checkAuth = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session) {
-      navigate("/student/auth");
-      return;
-    }
-
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', session.user.id)
-      .single();
-
-    if (!profileData || profileData.role !== 'student') {
-      await supabase.auth.signOut();
-      navigate("/student/auth");
-      return;
-    }
-
-    setProfile(profileData);
-    setLoading(false);
-  };
-
-  const fetchData = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-
-    // Fetch events
-    const { data: eventsData } = await supabase
-      .from('events')
-      .select('*, clubs(name)')
-      .eq('status', 'active')
-      .order('date_time', { ascending: true });
-    
-    setEvents(eventsData || []);
-
-    // Fetch clubs with member counts
-    const { data: clubsData } = await supabase
-      .from('clubs')
-      .select('*, club_memberships(count)')
-      .order('name', { ascending: true });
-    
-    setClubs(clubsData || []);
-
-    // Fetch user's club memberships
-    const { data: membershipsData } = await supabase
-      .from('club_memberships')
-      .select('club_id')
-      .eq('user_id', session.user.id);
-    
-    if (membershipsData) {
-      setClubMemberships(new Set(membershipsData.map(m => m.club_id)));
-    }
-
-    // Fetch event ratings
-    const { data: ratingsData } = await supabase
-      .from('event_ratings')
-      .select('event_id, rating')
-      .eq('user_id', session.user.id);
-    
-    if (ratingsData) {
-      const ratingsMap = new Map(ratingsData.map(r => [r.event_id, r.rating]));
-      setEventRatings(ratingsMap);
-    }
-
-    // Fetch announcements
-    const { data: announcementsData } = await supabase
-      .from('announcements')
-      .select('*')
-      .in('target_role', ['all', 'students'])
-      .order('created_at', { ascending: false })
-      .limit(5);
-    
-    setAnnouncements(announcementsData || []);
-
-    // Fetch placements (if semester 7 or 8)
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('semester')
-      .eq('id', session.user.id)
-      .single();
-
-    if (profileData && [7, 8].includes(profileData.semester)) {
-      const { data: placementsData } = await supabase
-        .from('placements')
-        .select('*')
+  const fetchData = async (userId: string) => {
+    try {
+      // Fetch events
+      const { data: eventsData } = await supabase
+        .from('events')
+        .select('*, clubs(name)')
         .eq('status', 'active')
-        .order('created_at', { ascending: false });
+        .order('date_time', { ascending: true });
       
-      setPlacements(placementsData || []);
+      setEvents(eventsData || []);
+
+      // Fetch clubs with member counts
+      const { data: clubsData } = await supabase
+        .from('clubs')
+        .select('*, club_memberships(count)')
+        .order('name', { ascending: true });
+      
+      setClubs(clubsData || []);
+
+      // Fetch user's club memberships
+      const { data: membershipsData } = await supabase
+        .from('club_memberships')
+        .select('club_id')
+        .eq('user_id', userId);
+      
+      if (membershipsData) {
+        setClubMemberships(new Set(membershipsData.map(m => m.club_id)));
+      }
+
+        // Fetch user's event attendance
+      const { data: attendanceData } = await supabase
+        .from('event_attendance')
+        .select('event_id')
+        .eq('user_id', userId);
+      
+      if (attendanceData) {
+        setJoinedEventIds(new Set(attendanceData.map(a => a.event_id)));
+      }
+
+      // Fetch event ratings
+      const { data: ratingsData } = await supabase
+        .from('event_ratings')
+        .select('event_id, rating')
+        .eq('user_id', userId);
+      
+      if (ratingsData) {
+        const ratingsMap = new Map(ratingsData.map(r => [r.event_id, r.rating]));
+        setEventRatings(ratingsMap);
+      }
+
+      // Fetch announcements
+      const { data: announcementsData } = await supabase
+        .from('announcements')
+        .select('*')
+        .in('target_role', ['all', 'students'])
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
+      setAnnouncements(announcementsData || []);
+
+      // Fetch placements (if semester 7 or 8)
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('semester')
+        .eq('id', userId)
+        .single();
+
+      if (profileData && [7, 8].includes(profileData.semester)) {
+        const { data: placementsData } = await supabase
+          .from('placements')
+          .select('*')
+          .eq('status', 'active')
+          .order('created_at', { ascending: false });
+        
+        setPlacements(placementsData || []);
+      }
+      
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      setLoading(false);
     }
   };
 
   const handleJoinEvent = async (eventId: string) => {
     try {
-      const { error } = await supabase
-        .from('event_attendance')
-        .insert({
-          event_id: eventId,
-          user_id: profile.id
-        });
+      if (joinedEventIds.has(eventId)) {
+        // Handle Leave Event
+        const { error } = await supabase
+          .from('event_attendance')
+          .delete()
+          .eq('event_id', eventId)
+          .eq('user_id', profile.id);
 
-      if (error) {
-        if (error.code === '23505') {
-          toast.error("You've already joined this event");
-        } else {
-          throw error;
-        }
+        if (error) throw error;
+        
+        toast.success("You have left the event.");
+        const newSet = new Set(joinedEventIds);
+        newSet.delete(eventId);
+        setJoinedEventIds(newSet);
       } else {
-        toast.success("Successfully joined event!");
-        fetchData();
+        // Handle Join Event
+        const { error } = await supabase
+          .from('event_attendance')
+          .insert({
+            event_id: eventId,
+            user_id: profile.id
+          });
+
+        if (error) {
+          if (error.code === '23505') {
+             toast.error("You've already joined this event");
+             // Sync state since they are effectively joined
+             const newSet = new Set(joinedEventIds);
+             newSet.add(eventId);
+             setJoinedEventIds(newSet);
+          } else {
+             throw error;
+          }
+        } else {
+          toast.success("Successfully joined event!");
+          const newSet = new Set(joinedEventIds);
+          newSet.add(eventId);
+          setJoinedEventIds(newSet);
+        }
       }
     } catch (error: any) {
       toast.error(error.message);
@@ -348,7 +425,7 @@ const StudentDashboard = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="events" className="space-y-6">
-          <TabsList className="grid w-full max-w-3xl mx-auto grid-cols-5 h-auto p-1">
+          <TabsList className="grid w-full max-w-3xl mx-auto grid-cols-6 h-auto p-1">
             <TabsTrigger value="calendar" className="flex flex-col items-center gap-1 py-2">
               <CalendarIcon className="h-4 w-4" />
               <span className="text-xs">Calendar</span>
@@ -371,7 +448,16 @@ const StudentDashboard = () => {
               <Bell className="h-4 w-4" />
               <span className="text-xs">Announcements</span>
             </TabsTrigger>
+            <TabsTrigger value="notes" className="flex flex-col items-center gap-1 py-2">
+              <BookOpen className="h-4 w-4" />
+              <span className="text-xs">Notes</span>
+            </TabsTrigger>
           </TabsList>
+
+          {/* Notes Tab */}
+          <TabsContent value="notes">
+            <NotesViewer />
+          </TabsContent>
 
           {/* Calendar Tab */}
           <TabsContent value="calendar">
@@ -415,8 +501,9 @@ const StudentDashboard = () => {
                       <Button 
                         onClick={() => handleJoinEvent(event.id)}
                         className="flex-1"
+                        variant={joinedEventIds.has(event.id) ? "secondary" : "default"}
                       >
-                        Join Event
+                        {joinedEventIds.has(event.id) ? "Joined (Undo)" : "Join Event"}
                       </Button>
                       {event.google_form_url && (
                         <Button 
@@ -484,21 +571,21 @@ const StudentDashboard = () => {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm text-muted-foreground mb-4">{club.description}</p>
+                      <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{club.description}</p>
                       <Button
                         variant={isMember ? "outline" : "default"}
                         className="w-full"
-                        onClick={() => isMember ? handleLeaveClub(club.id) : handleJoinClub(club.id)}
+                        onClick={() => navigate(`/club/${club.id}`)}
                       >
                         {isMember ? (
                           <>
-                            <HeartOff className="mr-2 h-4 w-4" />
-                            Leave Club
+                            <Heart className="mr-2 h-4 w-4 fill-current" />
+                            View Club
                           </>
                         ) : (
                           <>
-                            <Heart className="mr-2 h-4 w-4" />
-                            Join Club
+                            <Users className="mr-2 h-4 w-4" />
+                            View Club
                           </>
                         )}
                       </Button>

@@ -5,10 +5,23 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 const COLORS = ['hsl(271 81% 56%)', 'hsl(269 71% 66%)', 'hsl(267 61% 76%)', 'hsl(265 51% 86%)'];
 
+interface AttendanceData {
+  name: string;
+  attendance: number;
+}
+interface RatingData {
+  name: string;
+  rating: string;
+}
+interface MembershipData {
+  name: string;
+  value: number;
+}
+
 export const AnalyticsDashboard = () => {
-  const [attendanceData, setAttendanceData] = useState<any[]>([]);
-  const [eventRatingsData, setEventRatingsData] = useState<any[]>([]);
-  const [clubMembershipData, setClubMembershipData] = useState<any[]>([]);
+  const [attendanceData, setAttendanceData] = useState<AttendanceData[]>([]);
+  const [eventRatingsData, setEventRatingsData] = useState<RatingData[]>([]);
+  const [clubMembershipData, setClubMembershipData] = useState<MembershipData[]>([]);
   const [stats, setStats] = useState({
     totalEvents: 0,
     totalAttendance: 0,
@@ -52,8 +65,10 @@ export const AnalyticsDashboard = () => {
       .select('event_id, rating, events(title)');
 
     if (ratings) {
-      const ratingsByEvent = ratings.reduce((acc: any, curr) => {
-        const eventTitle = (curr.events as any)?.title || 'Unknown';
+      const ratingsByEvent = ratings.reduce((acc: Record<string, { total: number; count: number }>, curr) => {
+        // cast to unknown first to avoid any, then to expected shape
+        const eventData = curr.events as unknown as { title: string } | null;
+        const eventTitle = eventData?.title || 'Unknown';
         if (!acc[eventTitle]) {
           acc[eventTitle] = { total: 0, count: 0 };
         }
@@ -62,7 +77,7 @@ export const AnalyticsDashboard = () => {
         return acc;
       }, {});
 
-      const ratingsData = Object.entries(ratingsByEvent).map(([name, data]: [string, any]) => ({
+      const ratingsData = Object.entries(ratingsByEvent).map(([name, data]) => ({
         name: name.substring(0, 15),
         rating: (data.total / data.count).toFixed(1)
       }));

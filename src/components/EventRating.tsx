@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,14 +18,14 @@ const EventRating = ({ eventId, eventTitle, userId }: EventRatingProps) => {
   const [hoverRating, setHoverRating] = useState(0);
   const [review, setReview] = useState("");
   const [loading, setLoading] = useState(false);
-  const [existingRating, setExistingRating] = useState<any>(null);
+  const [existingRating, setExistingRating] = useState<Tables<'event_ratings'> | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchExistingRating();
-  }, [eventId, userId]);
+  }, [fetchExistingRating]);
 
-  const fetchExistingRating = async () => {
+  const fetchExistingRating = useCallback(async () => {
     const { data } = await supabase
       .from('event_ratings')
       .select('*')
@@ -37,7 +38,7 @@ const EventRating = ({ eventId, eventTitle, userId }: EventRatingProps) => {
       setRating(data.rating);
       setReview(data.review || "");
     }
-  };
+  }, [eventId, userId]);
 
   const handleSubmit = async () => {
     if (rating === 0) {
@@ -86,10 +87,10 @@ const EventRating = ({ eventId, eventTitle, userId }: EventRatingProps) => {
       }
 
       fetchExistingRating();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
       });
     } finally {

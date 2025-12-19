@@ -47,7 +47,7 @@ export const BulkStudentImport = ({ onImportComplete }: { onImportComplete: () =
         const values = lines[i].split(',').map(v => v.trim());
         if (values.length !== headers.length) continue;
 
-        const student: any = {};
+        const student: Record<string, string | number | null> = {};
         headers.forEach((header, index) => {
           student[header] = values[index];
         });
@@ -78,8 +78,8 @@ export const BulkStudentImport = ({ onImportComplete }: { onImportComplete: () =
 
       toast.success(`Imported ${successCount} students successfully${errorCount > 0 ? `, ${errorCount} failed` : ''}`);
       onImportComplete();
-    } catch (error: any) {
-      toast.error(`Import failed: ${error.message}`);
+    } catch (error) {
+      toast.error(`Import failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setImporting(false);
       e.target.value = '';

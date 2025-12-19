@@ -1,20 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import ProfileManagement from "@/components/ProfileManagement";
+import ProfileManagement, { ProfileData } from "@/components/ProfileManagement";
 
 const StudentProfile = () => {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
 
-  const checkAuth = async () => {
+
+  const checkAuth = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session) {
@@ -33,9 +31,29 @@ const StudentProfile = () => {
       return;
     }
 
-    setProfile(profileData);
+    // Also fetch student specific data (year, etc.) from students table
+    const { data: studentData } = await supabase
+      .from('students')
+      .select('*')
+      .eq('id', session.user.id)
+      .single();
+
+    // Merge profile and student data. 
+    // Priorities: studentData usually has the academic info (year, sem, branch)
+    // profiles has the auth info and avatar
+    setProfile({
+      ...profileData,
+      ...studentData, // invalidates duplicate keys from profileData with studentData versions
+      // ensure we keep the avatar and id from profile if needed (id should be same)
+      avatar_url: profileData.avatar_url,
+      name: profileData.name || studentData?.full_name // fallback
+    });
     setLoading(false);
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   const handleProfileUpdate = () => {
     checkAuth();

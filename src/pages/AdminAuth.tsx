@@ -64,8 +64,8 @@ const AdminAuth = () => {
         toast.success("Admin account created successfully!");
         navigate("/admin/dashboard");
       }
-    } catch (error: any) {
-      toast.error(error.message || "An error occurred");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {
       setLoading(false);
     }

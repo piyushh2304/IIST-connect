@@ -1,3 +1,14 @@
+# Implementation Guide: Edit Profile Functionality
+
+Here is the complete code to add the "Edit Profile" functionality to your Student Dashboard.
+
+## Instructions
+1.  Open the file `src/components/ProfileManagement.tsx`.
+2.  Replace the ENTIRE content of that file with the code below.
+
+## Code: `src/components/ProfileManagement.tsx`
+
+```tsx
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -8,59 +19,40 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, Loader2, Pencil, Save, X } from "lucide-react";
 
-export interface ProfileData {
-  id: string;
-  name: string;
-  email: string;
-  college_id: string | null;
-  year: number | null;
-  semester: number | null;
-  branch: string | null;
-  section: string | null;
-  phone_number: string | null;
-  date_of_birth: string | null;
-  avatar_url?: string | null;
-}
-
 interface ProfileManagementProps {
-  profile: ProfileData;
+  profile: any;
   onProfileUpdate: () => void;
 }
+
 const ProfileManagement = ({ profile, onProfileUpdate }: ProfileManagementProps) => {
-const [loading , setLoading] = useState(false);
-const [isEditing, setIsEditing] = useState(false);
-const [uploading , setUploading] = useState(false);
-const [formData , setFormData] = useState({
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState({
     name: "",
     email: "",
     college_id: "",
-    year: "",
     semester: "",
     branch: "",
-    section: "",
-    phone_number: "",
-    date_of_birth: ""
-})
-const { toast } = useToast();
+    section: ""
+  });
+  const { toast } = useToast();
 
-//initialize formdata when profile is availabe
-useEffect(() => {
+  // Initialize form data when profile is available
+  useEffect(() => {
     if (profile) {
       setFormData({
         name: profile.name || "",
         email: profile.email || "",
         college_id: profile.college_id || "",
-        year: profile.year ? profile.year.toString() : "",
         semester: profile.semester ? profile.semester.toString() : "",
         branch: profile.branch || "",
-        section: profile.section || "",
-        phone_number: profile.phone_number || "",
-        date_of_birth: profile.date_of_birth ? new Date(profile.date_of_birth).toISOString().split('T')[0] : ""
+        section: profile.section || ""
       });
     }
   }, [profile]);
 
-const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -68,55 +60,36 @@ const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     }));
   };
 
- const handleSave = async () => {
+  const handleSave = async () => {
     try {
       setLoading(true);
       
-      // Update profiles table (Auth/User info)
-      const { error: profileError } = await supabase
+      const { error } = await supabase
         .from('profiles')
         .update({
           name: formData.name,
           email: formData.email,
           college_id: formData.college_id,
+          // Convert semester back to number if present
           semester: formData.semester ? parseInt(formData.semester) : null,
           branch: formData.branch,
           section: formData.section
         })
         .eq('id', profile.id);
 
-      if (profileError) throw profileError;
-
-      // Update students table
-      // key to avoiding RLS issues: ensure we are targeting the AUTHENTICATED user's row
-      const { error: studentError } = await supabase
-        .from('students')
-        .upsert({
-          id: profile.id, 
-          email: formData.email,
-          full_name: formData.name,
-          year: formData.year ? parseInt(formData.year) : null,
-          semester: formData.semester ? parseInt(formData.semester) : null,
-          branch: formData.branch,
-          section: formData.section,
-          phone_number: formData.phone_number,
-          date_of_birth: formData.date_of_birth ? new Date(formData.date_of_birth).toISOString() : null
-        })
-        .select();
-
-      if (studentError) throw studentError;
+      if (error) throw error;
 
       toast({
         title: "Success",
         description: "Profile updated successfully",
       });
+
       setIsEditing(false);
       onProfileUpdate();
-    } catch (error) {
-      console.error("Profile update error:", error);
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update profile",
+        description: error.message,
         variant: "destructive",
       });
     } finally {
@@ -131,12 +104,9 @@ const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         name: profile.name || "",
         email: profile.email || "",
         college_id: profile.college_id || "",
-        year: profile.year ? profile.year.toString() : "",
         semester: profile.semester ? profile.semester.toString() : "",
         branch: profile.branch || "",
-        section: profile.section || "",
-        phone_number: profile.phone_number || "",
-        date_of_birth: profile.date_of_birth ? new Date(profile.date_of_birth).toISOString().split('T')[0] : ""
+        section: profile.section || ""
       });
     }
     setIsEditing(false);
@@ -173,10 +143,10 @@ const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       });
 
       onProfileUpdate();
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "An error occurred during upload",
+        description: error.message,
         variant: "destructive",
       });
     } finally {
@@ -281,30 +251,6 @@ const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
               disabled={!isEditing} 
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="phone_number">Phone Number</Label>
-              <Input 
-                id="phone_number"
-                name="phone_number"
-                value={isEditing ? formData.phone_number : (profile?.phone_number || "")} 
-                onChange={handleInputChange}
-                disabled={!isEditing} 
-                placeholder="+91..."
-              />
-            </div>
-            <div>
-              <Label htmlFor="date_of_birth">Date of Birth</Label>
-              <Input 
-                id="date_of_birth"
-                name="date_of_birth"
-                type="date"
-                value={isEditing ? formData.date_of_birth : (profile?.date_of_birth ? new Date(profile.date_of_birth).toISOString().split('T')[0] : "")} 
-                onChange={handleInputChange}
-                disabled={!isEditing} 
-              />
-            </div>
-          </div>
           <div>
             <Label htmlFor="college_id">College ID</Label>
             <Input 
@@ -315,18 +261,7 @@ const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
               disabled={!isEditing} 
             />
           </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="year">Year</Label>
-              <Input 
-                id="year"
-                name="year"
-                type="number"
-                value={isEditing ? formData.year : (profile?.year || "")} 
-                onChange={handleInputChange}
-                disabled={!isEditing} 
-              />
-            </div>
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="semester">Semester</Label>
               <Input 
@@ -366,3 +301,4 @@ const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 };
 
 export default ProfileManagement;
+```

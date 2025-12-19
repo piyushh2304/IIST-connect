@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Calendar, Briefcase, Users, Bell, LogOut, Plus, UserCircle, BarChart3, Wrench } from "lucide-react";
+import { Calendar, Briefcase, Users, Bell, LogOut, Plus, UserCircle, BarChart3, Wrench, FileText } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -16,104 +16,191 @@ import { AnalyticsDashboard } from "@/components/admin/AnalyticsDashboard";
 import { BulkStudentImport } from "@/components/admin/BulkStudentImport";
 import { EventQRCode } from "@/components/admin/EventQRCode";
 import { ReportsGeneration } from "@/components/admin/ReportsGeneration";
+import { EditClubDialog } from "@/components/admin/EditClubDialog";
 import { EventTemplates } from "@/components/admin/EventTemplates";
+import { NotesManager } from "@/components/admin/NotesManager";
+
+import { Tables, TablesInsert } from "@/integrations/supabase/types";
+
+// ... imports
+
+type EventWithClub = Tables<'events'> & { clubs: { name: string } | null };
+type StudentWithClubs = Tables<'students'>; // clubs are separate in this component logic
+type Placement = Tables<'placements'>;
+type Club = Tables<'clubs'>;
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<Tables<'profiles'> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [events, setEvents] = useState<any[]>([]);
-  const [clubs, setClubs] = useState<any[]>([]);
-  const [placements, setPlacements] = useState<any[]>([]);
-  const [students, setStudents] = useState<any[]>([]);
-  const [filteredStudents, setFilteredStudents] = useState<any[]>([]);
+  const [events, setEvents] = useState<EventWithClub[]>([]);
   const [eventAttendance, setEventAttendance] = useState<Record<string, number>>({});
+  const [clubs, setClubs] = useState<Club[]>([]);
+  const [placements, setPlacements] = useState<Placement[]>([]);
+  const [students, setStudents] = useState<Tables<'students'>[]>([]);
+  const [filteredStudents, setFilteredStudents] = useState<Tables<'students'>[]>([]);
+  const [studentClubs, setStudentClubs] = useState<Record<string, string[]>>({});
   const [filters, setFilters] = useState({
     year: "all",
     semester: "all",
     branch: "all",
     section: "all"
   });
+  const [viewParticipantsEventId, setViewParticipantsEventId] = useState<string | null>(null);
 
   useEffect(() => {
-    checkAuth();
-    fetchData();
+    let mounted = true;
+
+    const initializeAuth = async () => {
+      // Safety timeout
+      const timeoutId = setTimeout(() => {
+        if (mounted) {
+          console.warn("Auth check timed out");
+          setLoading(false);
+        }
+      }, 8000);
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          console.log("No session found in getSession");
+          if (mounted) navigate("/admin/auth");
+          clearTimeout(timeoutId);
+          return;
+        }
+
+        console.log("Session found:", session.user.id);
+
+        // Verify profile
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profileError) {
+          console.error("Profile fetch error:", profileError);
+        }
+
+        if (!profileData || profileData.role !== 'admin') {
+          console.warn("Invalid profile or role:", profileData);
+          await supabase.auth.signOut();
+          if (mounted) navigate("/admin/auth");
+          clearTimeout(timeoutId);
+          return;
+        }
+
+        if (mounted) {
+          setProfile(profileData);
+          await fetchData(session.user.id);
+        }
+      } catch (error) {
+        console.error("Auth initialization error:", error);
+        if (mounted) navigate("/admin/auth");
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    };
+
+    initializeAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth event:", event);
+      if (event === 'SIGNED_OUT') {
+        if (mounted) navigate("/admin/auth");
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const checkAuth = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session) {
-      navigate("/admin/auth");
-      return;
+  const fetchData = async (userId?: string) => {
+    // If no userId passed, try to get from current session (fallback)
+    if (!userId) {
+       const { data: { session } } = await supabase.auth.getSession();
+       if (!session) return;
+       userId = session.user.id;
     }
 
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', session.user.id)
-      .single();
+    try {
+      const { data: eventsData } = await supabase
+        .from('events')
+        .select('*, clubs(name)')
+        .order('date_time', { ascending: true });
+      
+      setEvents(eventsData || []);
 
-    if (!profileData || profileData.role !== 'admin') {
-      await supabase.auth.signOut();
-      navigate("/admin/auth");
-      return;
-    }
+      const { data: attendanceData } = await supabase
+        .from('event_attendance')
+        .select('event_id');
+      
+      const attendanceCount: Record<string, number> = {};
+      attendanceData?.forEach((record) => {
+        attendanceCount[record.event_id] = (attendanceCount[record.event_id] || 0) + 1;
+      });
+      setEventAttendance(attendanceCount);
 
-    setProfile(profileData);
-    setLoading(false);
-  };
+      const { data: clubsData } = await supabase
+        .from('clubs')
+        .select('*')
+        .order('name');
+      
+      setClubs(clubsData || []);
 
-  const fetchData = async () => {
-    // Fetch events
-    const { data: eventsData } = await supabase
-      .from('events')
-      .select('*, clubs(name)')
-      .order('date_time', { ascending: false });
-    
-    setEvents(eventsData || []);
+      const { data: placementsData } = await supabase
+        .from('placements')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      setPlacements(placementsData || []);
 
-    // Fetch event attendance counts
-    if (eventsData) {
-      const attendanceCounts: Record<string, number> = {};
-      for (const event of eventsData) {
-        const { count } = await supabase
-          .from('event_attendance')
-          .select('*', { count: 'exact', head: true })
-          .eq('event_id', event.id);
-        attendanceCounts[event.id] = count || 0;
+      const { data: studentsData } = await supabase
+        .from('students')
+        .select('*')
+        .order('full_name');
+        
+      if (studentsData) {
+        setStudents(studentsData);
+        setFilteredStudents(studentsData);
+        
+        // Fetch club memberships for all students
+        const { data: memberships } = await supabase
+          .from('club_memberships')
+          .select('user_id, clubs(name)');
+          
+        const clubMap: Record<string, string[]> = {};
+        // helper interface for the join result since we select clubs(name)
+        interface MembershipJoin { user_id: string; clubs: { name: string } | null }
+        
+        const membershipsData = memberships as unknown as MembershipJoin[];
+
+        membershipsData?.forEach((m) => {
+          // Map by user's email/id - since student table has email, we can match
+          // But here m.user_id is the auth id. 
+          // We need to map auth id to student email or link them.
+          // The student table has 'id' which IS the auth id (REFERENCES auth.users).
+          
+          // Let's find the student email for this user_id
+          const student = studentsData.find(s => s.id === m.user_id);
+          if (student && m.clubs && m.clubs.name) {
+             if (!clubMap[student.email]) clubMap[student.email] = [];
+             clubMap[student.email].push(m.clubs.name);
+          }
+        });
+        setStudentClubs(clubMap);
       }
-      setEventAttendance(attendanceCounts);
+      
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching admin data:", error);
+      setLoading(false);
     }
-
-    // Fetch clubs
-    const { data: clubsData } = await supabase
-      .from('clubs')
-      .select('*')
-      .order('name', { ascending: true });
-    
-    setClubs(clubsData || []);
-
-    // Fetch placements
-    const { data: placementsData } = await supabase
-      .from('placements')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    setPlacements(placementsData || []);
-
-    // Fetch students
-    const { data: studentsData } = await supabase
-      .from('students')
-      .select('*')
-      .order('year', { ascending: true })
-      .order('semester', { ascending: true })
-      .order('branch', { ascending: true })
-      .order('section', { ascending: true });
-    
-    setStudents(studentsData || []);
-    setFilteredStudents(studentsData || []);
   };
+
 
   useEffect(() => {
     applyFilters();
@@ -138,6 +225,7 @@ const AdminDashboard = () => {
     setFilteredStudents(filtered);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleCreateEvent = async (formData: any) => {
     try {
       const { error } = await supabase
@@ -156,12 +244,12 @@ const AdminDashboard = () => {
       
       toast.success("Event created successfully!");
       fetchData();
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "An error occurred");
     }
   };
 
-  const handleCreatePlacement = async (formData: any) => {
+  const handleCreatePlacement = async (formData: TablesInsert<'placements'>) => {
     try {
       const { error } = await supabase
         .from('placements')
@@ -178,12 +266,12 @@ const AdminDashboard = () => {
       
       toast.success("Placement created successfully!");
       fetchData();
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "An error occurred");
     }
   };
 
-  const handleCreateAnnouncement = async (formData: any) => {
+  const handleCreateAnnouncement = async (formData: TablesInsert<'announcements'>) => {
     try {
       const { error } = await supabase
         .from('announcements')
@@ -197,8 +285,8 @@ const AdminDashboard = () => {
       if (error) throw error;
       
       toast.success("Announcement published successfully!");
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "An error occurred");
     }
   };
 
@@ -260,6 +348,10 @@ const AdminDashboard = () => {
               <Bell className="h-4 w-4 mr-2" />
               Announce
             </TabsTrigger>
+            <TabsTrigger value="notes">
+              <FileText className="h-4 w-4 mr-2" />
+              Notes
+            </TabsTrigger>
             <TabsTrigger value="tools">
               <Wrench className="h-4 w-4 mr-2" />
               Tools
@@ -294,9 +386,14 @@ const AdminDashboard = () => {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <p className="text-sm text-muted-foreground">{event.description}</p>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Users className="h-4 w-4 text-primary" />
-                      <span className="font-medium">{eventAttendance[event.id] || 0} students joined</span>
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-primary" />
+                        <span className="font-medium">{eventAttendance[event.id] || 0} students joined</span>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => setViewParticipantsEventId(event.id)}>
+                        View List
+                      </Button>
                     </div>
                     <div className="flex gap-2">
                       <EventQRCode event={event} />
@@ -324,11 +421,62 @@ const AdminDashboard = () => {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {clubs.map((club) => (
                 <Card key={club.id} className="hover:shadow-lg transition-all duration-300">
-                  <CardHeader>
-                    <CardTitle>{club.name}</CardTitle>
+                  <CardHeader className="flex flex-row items-start justify-between space-y-0 p-6">
+                    <div className="space-y-1">
+                      <CardTitle className="text-xl">{club.name}</CardTitle>
+                      {club.details?.foundedBy && (
+                        <p className="text-xs text-muted-foreground">
+                           Founded by {club.details.foundedBy}
+                        </p>
+                      )}
+                    </div>
+                    <EditClubDialog club={club} onRefresh={fetchData} />
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">{club.description}</p>
+                  <CardContent className="p-6 pt-0 space-y-4">
+                    <p className="text-sm text-muted-foreground line-clamp-3">{club.description}</p>
+                    
+                    {/* Leadership Info */}
+                    <div className="pt-2 border-t text-sm space-y-1">
+                      {club.details?.facultyInCharge && (
+                        <div className="flex gap-2">
+                           <span className="font-semibold min-w-24">Faculty:</span>
+                           <span className="text-muted-foreground">
+                             {Array.isArray(club.details.facultyInCharge) 
+                               ? club.details.facultyInCharge.join(", ") 
+                               : club.details.facultyInCharge}
+                           </span>
+                        </div>
+                      )}
+                      
+                      {club.details?.president && (
+                        <div className="flex gap-2">
+                          <span className="font-semibold min-w-24">President:</span>
+                          <span className="text-muted-foreground">{club.details.president}</span>
+                        </div>
+                      )}
+
+                      {club.details?.vicePresident && (
+                        <div className="flex gap-2">
+                           <span className="font-semibold min-w-24">VP{Array.isArray(club.details.vicePresident) && club.details.vicePresident.length > 1 ? 's' : ''}:</span>
+                           <span className="text-muted-foreground">
+                             {Array.isArray(club.details.vicePresident) 
+                               ? club.details.vicePresident.join(", ") 
+                               : club.details.vicePresident}
+                           </span>
+                        </div>
+                      )}
+
+                      {club.details?.secretary && (
+                        <div className="flex gap-2">
+                           <span className="font-semibold min-w-24">Secretary{Array.isArray(club.details.secretary) && club.details.secretary.length > 1 ? 's' : ''}:</span>
+                           <span className="text-muted-foreground">
+                             {Array.isArray(club.details.secretary) 
+                               ? club.details.secretary.join(", ") 
+                               : club.details.secretary}
+                           </span>
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -368,7 +516,10 @@ const AdminDashboard = () => {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label>Year</Label>
-                  <Select value={filters.year} onValueChange={(value) => setFilters({ ...filters, year: value })}>
+                  <Select 
+                    value={filters.year} 
+                    onValueChange={(value) => setFilters({ ...filters, year: value })}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="All Years" />
                     </SelectTrigger>
@@ -384,49 +535,60 @@ const AdminDashboard = () => {
                 
                 <div className="space-y-2">
                   <Label>Semester</Label>
-                  <Select value={filters.semester} onValueChange={(value) => setFilters({ ...filters, semester: value })}>
+                  <Select 
+                    value={filters.semester} 
+                    onValueChange={(value) => setFilters({ ...filters, semester: value })}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="All Semesters" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Semesters</SelectItem>
-                      <SelectItem value="2">2nd Semester</SelectItem>
-                      <SelectItem value="4">4th Semester</SelectItem>
-                      <SelectItem value="6">6th Semester</SelectItem>
-                      <SelectItem value="8">8th Semester</SelectItem>
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
+                        <SelectItem key={sem} value={sem.toString()}>Semester {sem}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
                 
                 <div className="space-y-2">
                   <Label>Branch</Label>
-                  <Select value={filters.branch} onValueChange={(value) => setFilters({ ...filters, branch: value })}>
+                  <Select 
+                    value={filters.branch} 
+                    onValueChange={(value) => setFilters({ ...filters, branch: value })}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="All Branches" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Branches</SelectItem>
-                      <SelectItem value="CSE">CSE</SelectItem>
-                      <SelectItem value="IT">IT</SelectItem>
-                      <SelectItem value="IOT">IOT</SelectItem>
-                      <SelectItem value="CHEMICAL">CHEMICAL</SelectItem>
-                      <SelectItem value="CIVIL">CIVIL</SelectItem>
-                      <SelectItem value="MECHANICAL">MECHANICAL</SelectItem>
+                      {Array.from(new Set(students.map(s => s.branch)))
+                        .filter(Boolean)
+                        .sort()
+                        .map((branch) => (
+                          <SelectItem key={branch} value={branch}>{branch}</SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
                 
                 <div className="space-y-2">
                   <Label>Section</Label>
-                  <Select value={filters.section} onValueChange={(value) => setFilters({ ...filters, section: value })}>
+                  <Select 
+                    value={filters.section} 
+                    onValueChange={(value) => setFilters({ ...filters, section: value })}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="All Sections" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Sections</SelectItem>
-                      <SelectItem value="A1">A1</SelectItem>
-                      <SelectItem value="A2">A2</SelectItem>
-                      <SelectItem value="A3">A3</SelectItem>
+                      {Array.from(new Set(students.map(s => s.section)))
+                        .filter(Boolean)
+                        .sort()
+                        .map((section) => (
+                          <SelectItem key={section} value={section}>{section}</SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -445,6 +607,7 @@ const AdminDashboard = () => {
                       <TableHead>Semester</TableHead>
                       <TableHead>Branch</TableHead>
                       <TableHead>Section</TableHead>
+                      <TableHead>Clubs</TableHead>
                       <TableHead>Phone</TableHead>
                       <TableHead>DOB</TableHead>
                     </TableRow>
@@ -459,6 +622,18 @@ const AdminDashboard = () => {
                           <TableCell>{student.semester}</TableCell>
                           <TableCell>{student.branch}</TableCell>
                           <TableCell>{student.section}</TableCell>
+                          <TableCell>
+                            {studentClubs[student.email] && studentClubs[student.email].length > 0 
+                              ? <div className="flex flex-wrap gap-1">
+                                  {studentClubs[student.email].map((club, i) => (
+                                    <span key={i} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">
+                                      {club}
+                                    </span>
+                                  ))}
+                                </div>
+                              : "-"
+                            }
+                          </TableCell>
                           <TableCell>{student.phone_number}</TableCell>
                           <TableCell>{new Date(student.date_of_birth).toLocaleDateString()}</TableCell>
                         </TableRow>
@@ -484,6 +659,11 @@ const AdminDashboard = () => {
             </div>
           </TabsContent>
 
+          {/* Notes Tab */}
+          <TabsContent value="notes" className="space-y-4">
+             <NotesManager />
+          </TabsContent>
+
           {/* Tools Tab */}
           <TabsContent value="tools" className="space-y-6">
             <h2 className="text-2xl font-bold mb-4">Admin Tools</h2>
@@ -491,12 +671,19 @@ const AdminDashboard = () => {
             <ReportsGeneration />
           </TabsContent>
         </Tabs>
+
+        {viewParticipantsEventId && (
+          <ViewParticipantsDialog 
+            eventId={viewParticipantsEventId} 
+            onClose={() => setViewParticipantsEventId(null)} 
+          />
+        )}
       </main>
     </div>
   );
 };
 
-const sendEventNotification = async (event: any) => {
+const sendEventNotification = async (event: EventWithClub) => {
   try {
     const { data, error } = await supabase.functions.invoke('send-event-notification', {
       body: {
@@ -510,13 +697,13 @@ const sendEventNotification = async (event: any) => {
 
     if (error) throw error;
     toast.success(`Notifications sent to ${data.notifiedUsers} users`);
-  } catch (error: any) {
-    toast.error(`Failed to send notifications: ${error.message}`);
+  } catch (error) {
+    toast.error(`Failed to send notifications: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 };
 
 // Create Event Dialog Component
-const CreateEventDialog = ({ clubs, onCreate }: any) => {
+function CreateEventDialog({ clubs, onCreate }: { clubs: Club[], onCreate: (data: TablesInsert<'events'>) => void }) {
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
@@ -580,7 +767,7 @@ const CreateEventDialog = ({ clubs, onCreate }: any) => {
               required
             >
               <option value="">Select Club</option>
-              {clubs.map((club: any) => (
+              {clubs.map((club) => (
                 <option key={club.id} value={club.id}>{club.name}</option>
               ))}
             </select>
@@ -618,7 +805,7 @@ const CreateEventDialog = ({ clubs, onCreate }: any) => {
 };
 
 // Create Club Dialog Component
-const CreateClubDialog = ({ onRefresh }: any) => {
+function CreateClubDialog({ onRefresh }: { onRefresh: () => void }) {
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -638,8 +825,8 @@ const CreateClubDialog = ({ onRefresh }: any) => {
       setOpen(false);
       setFormData({ name: "", description: "" });
       onRefresh();
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "An error occurred");
     }
   };
 
@@ -681,7 +868,7 @@ const CreateClubDialog = ({ onRefresh }: any) => {
 };
 
 // Create Placement Dialog Component
-const CreatePlacementDialog = ({ onCreate }: any) => {
+function CreatePlacementDialog({ onCreate }: { onCreate: (data: TablesInsert<'placements'>) => void }) {
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
@@ -757,7 +944,7 @@ const CreatePlacementDialog = ({ onCreate }: any) => {
 };
 
 // Create Announcement Dialog Component
-const CreateAnnouncementDialog = ({ onCreate }: any) => {
+function CreateAnnouncementDialog({ onCreate }: { onCreate: (data: TablesInsert<'announcements'>) => void }) {
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
@@ -821,5 +1008,76 @@ const CreateAnnouncementDialog = ({ onCreate }: any) => {
     </Dialog>
   );
 };
+
+// View Participants Dialog
+function ViewParticipantsDialog({ eventId, onClose }: { eventId: string | null, onClose: () => void }) {
+  const [participants, setParticipants] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (eventId) {
+      fetchParticipants();
+    }
+  }, [eventId]);
+
+  const fetchParticipants = async () => {
+    if (!eventId) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('event_attendance')
+        .select('*, students:user_id(full_name, email, branch, year)')
+        .eq('event_id', eventId);
+
+      if (error) throw error;
+      setParticipants(data || []);
+    } catch (error) {
+      toast.error("Failed to fetch participants");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={!!eventId} onOpenChange={() => onClose()}>
+      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Event Participants</DialogTitle>
+          <DialogDescription>List of students registered for this event</DialogDescription>
+        </DialogHeader>
+        <div className="flex-1 overflow-auto mt-4">
+          {loading ? (
+             <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div></div>
+          ) : participants.length === 0 ? (
+             <p className="text-center text-muted-foreground p-8">No participants yet.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Branch</TableHead>
+                  <TableHead>Year</TableHead>
+                  <TableHead>Joined At</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {participants.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium">{p.students?.full_name || 'Unknown'}</TableCell>
+                    <TableCell>{p.students?.email}</TableCell>
+                    <TableCell>{p.students?.branch}</TableCell>
+                    <TableCell>{p.students?.year}</TableCell>
+                    <TableCell>{new Date(p.joined_at).toLocaleDateString()}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default AdminDashboard;
