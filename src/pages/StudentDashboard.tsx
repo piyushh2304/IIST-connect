@@ -225,8 +225,9 @@ const StudentDashboard = () => {
           setJoinedEventIds(newSet);
         }
       }
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "An unknown error occurred";
+      toast.error(message);
     }
   };
 
@@ -247,10 +248,11 @@ const StudentDashboard = () => {
         }
       } else {
         toast.success("Successfully joined club!");
-        fetchData();
+        if (profile?.id) fetchData(profile.id);
       }
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error) {
+       const message = error instanceof Error ? error.message : "An unknown error occurred";
+      toast.error(message);
     }
   };
 
@@ -265,9 +267,10 @@ const StudentDashboard = () => {
       if (error) throw error;
 
       toast.success("Left club successfully");
-      fetchData();
-    } catch (error: any) {
-      toast.error(error.message);
+      if (profile?.id) fetchData(profile.id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "An unknown error occurred";
+      toast.error(message);
     }
   };
 

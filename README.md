@@ -2,10 +2,6 @@
 
 A comprehensive web application for managing college events, clubs, placements, and announcements with separate portals for students and administrators.
 
-## 🚀 Live Demo
-
-**URL**: https://lovable.dev/projects/fda1ea2f-5ae0-471a-b77f-30e9ee2d63d3
-
 ## 📋 Project Overview
 
 This full-stack web application streamlines college event management by providing dedicated dashboards for students and administrators. Students can browse and join events, explore clubs, view placement opportunities, and stay updated with announcements. Administrators have complete control over managing events, clubs, placements, student records, and announcements.
@@ -62,11 +58,11 @@ This full-stack web application streamlines college event management by providin
   - Lucide React icons
   - Sonner for toast notifications
 
-### Backend (Lovable Cloud - Supabase)
-- **Database**: PostgreSQL (via Supabase)
+### Backend (Supabase)
+- **Database**: PostgreSQL
 - **Authentication**: Supabase Auth
 - **Real-time**: Supabase Realtime (for live updates)
-- **API**: Supabase JavaScript Client 2.75.0
+- **API**: Supabase JavaScript Client
 
 ### Form Handling & Validation
 - **React Hook Form** 7.61.1
@@ -176,7 +172,7 @@ This full-stack web application streamlines college event management by providin
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js & npm ([install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating))
+- Node.js & npm
 - Git
 
 ### Installation
@@ -193,10 +189,9 @@ npm install
 ```
 
 3. **Set up environment variables**
-The `.env` file is auto-generated with Lovable Cloud credentials:
+Create a `.env` file with Supabase credentials:
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
-- `VITE_SUPABASE_PROJECT_ID`
 
 4. **Start the development server**
 ```bash
@@ -213,17 +208,11 @@ npm run build
 
 ## 🌐 Deployment
 
-### Via Lovable
-1. Open your [Lovable Project](https://lovable.dev/projects/fda1ea2f-5ae0-471a-b77f-30e9ee2d63d3)
-2. Click **Share → Publish**
-3. Your app will be deployed automatically
+For detailed deployment instructions, please refer to [DEPLOYMENT.md](DEPLOYMENT.md).
 
-### Custom Domain
-1. Navigate to **Project > Settings > Domains**
-2. Click **Connect Domain**
-3. Follow the DNS configuration steps
-
-[Learn more about custom domains](https://docs.lovable.dev/features/custom-domain)
+### Quick Hosting Options
+- **Netlify**: Drag and drop the `dist` folder.
+- **Vercel**: Connect your Git repository.
 
 ## 📱 Routes
 
@@ -245,7 +234,7 @@ npm run build
 ### Code Quality
 - **TypeScript**: Full type safety
 - **ESLint**: Code linting
-- **Prettier**: Code formatting (via Lovable)
+- **Prettier**: Code formatting
 
 ## 🎯 Key Functionalities Implemented
 
@@ -292,13 +281,6 @@ npm run build
 - **SQL Injection Protection**: Parameterized queries via Supabase
 - **XSS Protection**: React's built-in escaping
 
-## 🐛 Known Limitations
-
-- Email verification is auto-confirmed (development mode)
-- No file upload functionality for avatars yet
-- No email notification system
-- Limited to web platform (no native mobile apps)
-
 ## 🔮 Future Enhancements
 
 - Event calendar view
@@ -313,42 +295,11 @@ npm run build
 
 ## 📚 Resources
 
-- [Lovable Documentation](https://docs.lovable.dev/)
 - [Supabase Documentation](https://supabase.com/docs)
 - [shadcn/ui Documentation](https://ui.shadcn.com/)
 - [React Documentation](https://react.dev/)
 - [Tailwind CSS Documentation](https://tailwindcss.com/)
 
-## 🤝 Contributing
-
-This project was built with [Lovable](https://lovable.dev), an AI-powered web development platform.
-
-### Editing Options
-
-**Via Lovable** (Recommended)
-- Visit the [Lovable Project](https://lovable.dev/projects/fda1ea2f-5ae0-471a-b77f-30e9ee2d63d3)
-- Start prompting to make changes
-- Changes auto-commit to this repo
-
-**Local Development**
-- Clone the repo and make changes
-- Push changes to sync with Lovable
-
-**GitHub Codespaces**
-- Click **Code → Codespaces → New codespace**
-- Edit and commit directly
-
 ## 📄 License
 
 This project is part of a learning initiative. Feel free to use it as a reference for your own projects.
-
-## 🙏 Acknowledgments
-
-- Built with [Lovable](https://lovable.dev)
-- UI components from [shadcn/ui](https://ui.shadcn.com/)
-- Icons from [Lucide](https://lucide.dev/)
-- Backend powered by [Supabase](https://supabase.com/)
-
----
-
-**Built with ❤️ using Lovable**

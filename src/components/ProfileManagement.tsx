@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,11 +27,12 @@ interface ProfileManagementProps {
   profile: ProfileData;
   onProfileUpdate: () => void;
 }
+
 const ProfileManagement = ({ profile, onProfileUpdate }: ProfileManagementProps) => {
-const [loading , setLoading] = useState(false);
-const [isEditing, setIsEditing] = useState(false);
-const [uploading , setUploading] = useState(false);
-const [formData , setFormData] = useState({
+  const [loading, setLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [formData, setFormData] = useState({
     name: "",
     email: "",
     college_id: "",
@@ -40,11 +42,11 @@ const [formData , setFormData] = useState({
     section: "",
     phone_number: "",
     date_of_birth: ""
-})
-const { toast } = useToast();
+  });
+  const { toast } = useToast();
 
-//initialize formdata when profile is availabe
-useEffect(() => {
+  // Initialize form data when profile is available
+  useEffect(() => {
     if (profile) {
       setFormData({
         name: profile.name || "",
@@ -60,7 +62,7 @@ useEffect(() => {
     }
   }, [profile]);
 
-const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -68,7 +70,7 @@ const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     }));
   };
 
- const handleSave = async () => {
+  const handleSave = async () => {
     try {
       setLoading(true);
       
