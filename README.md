@@ -2,6 +2,13 @@
 
 A comprehensive web application for managing college events, clubs, placements, and announcements with separate portals for students and administrators.
 
+<<<<<<< HEAD
+=======
+## 🚀 Live Demo
+
+**URL**: https://iist-connect-mmbb.vercel.app/
+
+>>>>>>> 7ea45bf6b2ae1422b389f65de2e6b949931463ff
 ## 📋 Project Overview
 
 This full-stack web application streamlines college event management by providing dedicated dashboards for students and administrators. Students can browse and join events, explore clubs, view placement opportunities, and stay updated with announcements. Administrators have complete control over managing events, clubs, placements, student records, and announcements.
