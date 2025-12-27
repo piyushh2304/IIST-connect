@@ -6,7 +6,7 @@ A comprehensive web application for managing college events, clubs, placements, 
 =======
 ## 🚀 Live Demo
 
-**URL**: https://iist-connect-mmbb.vercel.app/
+**URL**:[ https://iist-connect-mmbb.vercel.app/](https://iist-connect.vercel.app/)
 
 >>>>>>> 7ea45bf6b2ae1422b389f65de2e6b949931463ff
 ## 📋 Project Overview
