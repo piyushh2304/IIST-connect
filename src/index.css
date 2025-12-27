@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 15%;
+
+    --primary: 271 81% 56%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 270 40% 95%;
+    --secondary-foreground: 271 81% 56%;
+
+    --muted: 270 30% 96%;
+    --muted-foreground: 240 5% 45%;
+
+    --accent: 269 71% 91%;
+    --accent-foreground: 271 81% 56%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 270 20% 90%;
+    --input: 270 20% 90%;
+    --ring: 271 81% 56%;
+
+    --radius: 0.75rem;
+
+    --gradient-primary: linear-gradient(135deg, hsl(271 81% 56%), hsl(269 71% 66%));
+    --gradient-subtle: linear-gradient(180deg, hsl(0 0% 100%), hsl(270 40% 98%));
+    --shadow-card: 0 2px 12px -2px hsl(271 81% 56% / 0.08);
+    --shadow-hover: 0 8px 24px -4px hsl(271 81% 56% / 0.15);
+  }
+
+  .dark {
+    --background: 240 10% 8%;
+    --foreground: 0 0% 95%;
+
+    --card: 240 10% 10%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 240 10% 10%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 271 81% 66%;
+    --primary-foreground: 240 10% 8%;
+
+    --secondary: 240 10% 15%;
+    --secondary-foreground: 0 0% 95%;
+
+    --muted: 240 10% 15%;
+    --muted-foreground: 240 5% 65%;
+
+    --accent: 240 10% 20%;
+    --accent-foreground: 271 81% 66%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 95%;
+
+    --border: 240 10% 20%;
+    --input: 240 10% 20%;
+    --ring: 271 81% 66%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(271 81% 66%), hsl(269 71% 76%));
+    --gradient-subtle: linear-gradient(180deg, hsl(240 10% 8%), hsl(240 10% 12%));
+    --shadow-card: 0 2px 12px -2px hsl(271 81% 66% / 0.12);
+    --shadow-hover: 0 8px 24px -4px hsl(271 81% 66% / 0.2);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fade-in 0.5s ease-out;
+  }
+  
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
