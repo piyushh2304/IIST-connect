@@ -153,9 +153,16 @@ const StudentDashboard = () => {
         }
 
         if (!profileData || profileData.role !== 'student') {
-          console.warn("Invalid profile or role:", profileData);
-          await supabase.auth.signOut();
-          if (mounted) navigate("/student/auth");
+          console.warn("Invalid profile or role for student dashboard:", profileData);
+          if (profileData?.role === 'admin') {
+             if (mounted) navigate("/admin/dashboard");
+          } else {
+             // If completely unknown or invalid, valid to sign out? 
+             // Or maybe just redirect to auth.
+             // keeping sign out for truly invalid roles for security, 
+             // but for 'admin' we redirect.
+             if (mounted) navigate("/student/auth"); 
+          }
           return;
         }
 

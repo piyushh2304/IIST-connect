@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -58,77 +58,8 @@ const AdminDashboard = () => {
   const [viewParticipantsEventId, setViewParticipantsEventId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("analytics");
 
-  useEffect(() => {
-    let mounted = true;
-
-    const initializeAuth = async () => {
-      // Safety timeout
-      const timeoutId = setTimeout(() => {
-        if (mounted) {
-          console.warn("Auth check timed out");
-          setLoading(false);
-        }
-      }, 8000);
-
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!session) {
-          console.log("No session found in getSession");
-          if (mounted) navigate("/admin/auth");
-          clearTimeout(timeoutId);
-          return;
-        }
-
-        console.log("Session found:", session.user.id);
-
-        // Verify profile
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-
-        if (profileError) {
-          console.error("Profile fetch error:", profileError);
-        }
-
-        if (!profileData || profileData.role !== 'admin') {
-          console.warn("Invalid profile or role:", profileData);
-          await supabase.auth.signOut();
-          if (mounted) navigate("/admin/auth");
-          clearTimeout(timeoutId);
-          return;
-        }
-
-        if (mounted) {
-          setProfile(profileData);
-          await fetchData(session.user.id);
-        }
-      } catch (error) {
-        console.error("Auth initialization error:", error);
-        if (mounted) navigate("/admin/auth");
-      } finally {
-        clearTimeout(timeoutId);
-      }
-    };
-
-    initializeAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth event:", event);
-      if (event === 'SIGNED_OUT') {
-        if (mounted) navigate("/admin/auth");
-      }
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  const fetchData = async (userId?: string) => {
+  /* fetchData moved here */
+  const fetchData = useCallback(async (userId?: string) => {
     // If no userId passed, try to get from current session (fallback)
     if (!userId) {
        const { data: { session } } = await supabase.auth.getSession();
@@ -189,12 +120,6 @@ const AdminDashboard = () => {
         const membershipsData = memberships as unknown as MembershipJoin[];
 
         membershipsData?.forEach((m) => {
-          // Map by user's email/id - since student table has email, we can match
-          // But here m.user_id is the auth id. 
-          // We need to map auth id to student email or link them.
-          // The student table has 'id' which IS the auth id (REFERENCES auth.users).
-          
-          // Let's find the student email for this user_id
           const student = studentsData.find(s => s.id === m.user_id);
           if (student && m.clubs && m.clubs.name) {
              if (!clubMap[student.email]) clubMap[student.email] = [];
@@ -209,7 +134,90 @@ const AdminDashboard = () => {
       console.error("Error fetching admin data:", error);
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const initializeAuth = async () => {
+      // Safety timeout
+      const timeoutId = setTimeout(() => {
+        if (mounted && loading) {
+          console.warn("Auth check timed out");
+          setLoading(false);
+          // If after 8s we are still loading, maybe then redirect?
+          // But let's verify if we have a profile.
+          // navigate("/admin/auth"); 
+        }
+      }, 8000);
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          console.log("No session found in getSession");
+          // FIX: Do NOT redirect immediately.
+          // Wait for onAuthStateChange to confirm SIGNED_OUT or SIGNED_IN.
+          return;
+        }
+
+        console.log("Session found:", session.user.id);
+
+        // Verify profile
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profileError) {
+          console.error("Profile fetch error:", profileError);
+        }
+
+        if (!profileData || profileData.role !== 'admin') {
+          console.warn("Invalid profile or role for admin dashboard:", profileData);
+          if (profileData?.role === 'student') {
+             if (mounted) navigate("/student/dashboard");
+          } else {
+             if (mounted) navigate("/admin/auth");
+          }
+          clearTimeout(timeoutId);
+          return;
+        }
+
+        if (mounted) {
+          setProfile(profileData);
+          fetchData(session.user.id);
+        }
+      } catch (error) {
+        console.error("Auth initialization error:", error);
+        // if (mounted) navigate("/admin/auth");
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    };
+
+    initializeAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth event:", event);
+      if (event === 'SIGNED_OUT') {
+        if (mounted) navigate("/admin/auth");
+      } else if (event === 'SIGNED_IN' && session) {
+        // If we just signed in, or if we are double checking
+         if (mounted && !profile) {
+            initializeAuth();
+         }
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [fetchData]);
+
+
 
 
   useEffect(() => {

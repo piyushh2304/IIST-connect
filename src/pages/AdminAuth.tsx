@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,26 @@ const AdminAuth = () => {
   });
   
   const navigate = useNavigate();
+  
+  useEffect(() => {
+    // Check if already logged in
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single();
+          
+        if (profile?.role === 'admin') {
+          navigate("/admin/dashboard");
+        }
+      }
+    };
+    
+    checkUser();
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
