@@ -4,6 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { toast } from "sonner";
 import { ArrowLeft, Users, Calendar, Heart, HeartOff } from "lucide-react";
 
@@ -125,7 +126,7 @@ const ClubDetails = () => {
         }
       } else {
         toast.success("Successfully joined club!");
-        fetchClubData(profile.id); // Refresh data
+        if (id) fetchClubData(profile.id, id); // Refresh data
       }
     } catch (error: any) {
       toast.error(error.message);
@@ -143,7 +144,7 @@ const ClubDetails = () => {
       if (error) throw error;
 
       toast.success("Left club successfully");
-      fetchClubData(profile.id); // Refresh data
+      if (id) fetchClubData(profile.id, id); // Refresh data
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -307,17 +308,46 @@ const ClubDetails = () => {
               <div className="space-y-4">
                 <h3 className="text-2xl font-semibold border-b pb-2">Club Activities</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {club.details.activities.map((activity: any, index: number) => (
-                    <Card key={index} className="overflow-hidden hover:shadow-md transition-shadow">
-                      {activity.image && (
-                        <div className="h-48 overflow-hidden">
-                          <img 
-                            src={activity.image} 
-                            alt={activity.title} 
-                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-                          />
-                        </div>
-                      )}
+                  {club.details.activities.map((activity: any, index: number) => {
+                    const displayImages = activity.images?.length > 0 
+                      ? activity.images 
+                      : activity.image 
+                        ? [activity.image] 
+                        : [];
+
+                    return (
+                      <Card key={index} className="overflow-hidden hover:shadow-md transition-shadow group">
+                        {displayImages.length > 0 && (
+                          <div className="h-48 overflow-hidden relative">
+                            {displayImages.length > 1 ? (
+                              <Carousel className="w-full h-full">
+                                <CarouselContent>
+                                  {displayImages.map((img: string, i: number) => (
+                                    <CarouselItem key={i}>
+                                      <div className="h-48">
+                                        <img 
+                                          src={img} 
+                                          alt={`${activity.title} ${i + 1}`} 
+                                          className="w-full h-full object-cover"
+                                        />
+                                      </div>
+                                    </CarouselItem>
+                                  ))}
+                                </CarouselContent>
+                                <div className="absolute top-1/2 left-0 w-full px-4 flex justify-between pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
+                                   <CarouselPrevious className="pointer-events-auto relative left-0 translate-y-0 h-8 w-8 bg-black/50 hover:bg-black/70 border-none text-white" />
+                                   <CarouselNext className="pointer-events-auto relative right-0 translate-y-0 h-8 w-8 bg-black/50 hover:bg-black/70 border-none text-white" />
+                                </div>
+                              </Carousel>
+                            ) : (
+                              <img 
+                                src={displayImages[0]} 
+                                alt={activity.title} 
+                                className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                              />
+                            )}
+                          </div>
+                        )}
                       <CardHeader>
                         <div className="flex justify-between items-start">
                           <CardTitle className="text-xl">{activity.title}</CardTitle>
@@ -332,7 +362,8 @@ const ClubDetails = () => {
                         <p className="text-muted-foreground">{activity.description}</p>
                       </CardContent>
                     </Card>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

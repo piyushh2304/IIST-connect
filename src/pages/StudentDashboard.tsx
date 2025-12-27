@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -29,29 +29,113 @@ const StudentDashboard = () => {
   const [eventRatings, setEventRatings] = useState<Map<string, number>>(new Map());
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
-  const [sortBy, setSortBy] = useState("date-desc");
+  const [eventsSort, setEventsSort] = useState("date-desc");
+  const [clubsSort, setClubsSort] = useState("name");
+  const [placementsSort, setPlacementsSort] = useState("recent");
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [joinedEventIds, setJoinedEventIds] = useState<Set<string>>(new Set());
+
+  // Define fetchData BEFORE useEffect
+  const fetchData = useCallback(async (userId: string) => {
+      try {
+        // Fetch events
+        const { data: eventsData } = await supabase
+          .from('events')
+          .select('*, clubs(name)')
+          .eq('status', 'active')
+          .order('date_time', { ascending: true });
+        
+        setEvents(eventsData || []);
+  
+        // Fetch clubs with member counts
+        const { data: clubsData } = await supabase
+          .from('clubs')
+          .select('*, club_memberships(count)')
+          .order('name', { ascending: true });
+        
+        setClubs(clubsData || []);
+  
+        // Fetch user's club memberships
+        const { data: membershipsData } = await supabase
+          .from('club_memberships')
+          .select('club_id')
+          .eq('user_id', userId);
+        
+        if (membershipsData) {
+          setClubMemberships(new Set(membershipsData.map(m => m.club_id)));
+        }
+  
+          // Fetch user's event attendance
+        const { data: attendanceData } = await supabase
+          .from('event_attendance')
+          .select('event_id')
+          .eq('user_id', userId);
+        
+        if (attendanceData) {
+          setJoinedEventIds(new Set(attendanceData.map(a => a.event_id)));
+        }
+  
+        // Fetch event ratings
+        const { data: ratingsData } = await supabase
+          .from('event_ratings')
+          .select('event_id, rating')
+          .eq('user_id', userId);
+        
+        if (ratingsData) {
+          const ratingsMap = new Map(ratingsData.map(r => [r.event_id, r.rating]));
+          setEventRatings(ratingsMap);
+        }
+  
+        // Fetch announcements
+        const { data: announcementsData } = await supabase
+          .from('announcements')
+          .select('*')
+          .in('target_role', ['all', 'students'])
+          .order('created_at', { ascending: false })
+          .limit(5);
+        
+        setAnnouncements(announcementsData || []);
+  
+        // Fetch placements (if semester 7 or 8)
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('semester')
+          .eq('id', userId)
+          .single();
+  
+        if (profileData && [7, 8].includes(profileData.semester)) {
+          const { data: placementsData } = await supabase
+            .from('placements')
+            .select('*')
+            .eq('status', 'active')
+            .order('created_at', { ascending: false });
+          
+          setPlacements(placementsData || []);
+        }
+        
+        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        setLoading(false);
+      }
+    }, []);
 
   useEffect(() => {
     let mounted = true;
 
     const initializeAuth = async () => {
-      // Safety timeout
-      const timeoutId = setTimeout(() => {
-        if (mounted) {
-          console.warn("Auth check timed out");
-          setLoading(false);
-        }
-      }, 8000);
-
       try {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session) {
-          console.log("No session found in getSession");
+          // Verify with onAuthStateChange before giving up? 
+          // Actually, stick to getSession but allow a retry or rely on the listener if it's just a timing issue.
+          // For now, simpler: just don't aggressively redirect if it's potentially loading.
+          // But valid session is required.
+          console.log("No session in getSession");
+          // Check if we are handling a redirect?
+          // If simply null, user might be logged out.
           if (mounted) navigate("/student/auth");
-          clearTimeout(timeoutId);
           return;
         }
 
@@ -62,126 +146,71 @@ const StudentDashboard = () => {
           .eq('id', session.user.id)
           .single();
 
-        if (profileError) console.error("Profile fetch error:", profileError);
+        if (profileError) {
+          console.error("Profile fetch error:", profileError);
+          // Don't sign out immediately on error, might be network flake
+          return;
+        }
 
         if (!profileData || profileData.role !== 'student') {
           console.warn("Invalid profile or role:", profileData);
           await supabase.auth.signOut();
           if (mounted) navigate("/student/auth");
-          clearTimeout(timeoutId);
           return;
         }
 
         if (mounted) {
           setProfile(profileData);
-          await fetchData(session.user.id); // Await fetchData ensuring we clear timeout after IT finishes
+          await fetchData(session.user.id);
         }
       } catch (error) {
         console.error("Auth initialization error:", error);
-        if (mounted) navigate("/student/auth");
+        // Do not force logout on every error
       } finally {
-        clearTimeout(timeoutId);
+        if (mounted) setLoading(false);
       }
     };
 
     initializeAuth();
 
+    // Set up Realtime subscription for events
+    const channel = supabase
+      .channel('public:events')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'events' },
+        (payload) => {
+          console.log('Realtime update:', payload);
+          // Refresh data when an event is added/modified
+          // We need the current user ID to refresh properly (for joined status etc)
+          // But profile might not be set in closure yet.
+          // Simple approach: just fetch events again or reload page data.
+          // Accessing session directly is safer.
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session?.user?.id) {
+               fetchData(session.user.id);
+            }
+          });
+        }
+      )
+      .subscribe();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth event:", event);
       if (event === 'SIGNED_OUT') {
         if (mounted) navigate("/student/auth");
+      } else if (event === 'SIGNED_IN' && session) {
+        // Double check we are set up
+         if (mounted && !profile) {
+            initializeAuth();
+         }
       }
     });
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
     };
-  }, []);
+  }, [fetchData]);
 
-  const fetchData = async (userId: string) => {
-    try {
-      // Fetch events
-      const { data: eventsData } = await supabase
-        .from('events')
-        .select('*, clubs(name)')
-        .eq('status', 'active')
-        .order('date_time', { ascending: true });
-      
-      setEvents(eventsData || []);
 
-      // Fetch clubs with member counts
-      const { data: clubsData } = await supabase
-        .from('clubs')
-        .select('*, club_memberships(count)')
-        .order('name', { ascending: true });
-      
-      setClubs(clubsData || []);
-
-      // Fetch user's club memberships
-      const { data: membershipsData } = await supabase
-        .from('club_memberships')
-        .select('club_id')
-        .eq('user_id', userId);
-      
-      if (membershipsData) {
-        setClubMemberships(new Set(membershipsData.map(m => m.club_id)));
-      }
-
-        // Fetch user's event attendance
-      const { data: attendanceData } = await supabase
-        .from('event_attendance')
-        .select('event_id')
-        .eq('user_id', userId);
-      
-      if (attendanceData) {
-        setJoinedEventIds(new Set(attendanceData.map(a => a.event_id)));
-      }
-
-      // Fetch event ratings
-      const { data: ratingsData } = await supabase
-        .from('event_ratings')
-        .select('event_id, rating')
-        .eq('user_id', userId);
-      
-      if (ratingsData) {
-        const ratingsMap = new Map(ratingsData.map(r => [r.event_id, r.rating]));
-        setEventRatings(ratingsMap);
-      }
-
-      // Fetch announcements
-      const { data: announcementsData } = await supabase
-        .from('announcements')
-        .select('*')
-        .in('target_role', ['all', 'students'])
-        .order('created_at', { ascending: false })
-        .limit(5);
-      
-      setAnnouncements(announcementsData || []);
-
-      // Fetch placements (if semester 7 or 8)
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('semester')
-        .eq('id', userId)
-        .single();
-
-      if (profileData && [7, 8].includes(profileData.semester)) {
-        const { data: placementsData } = await supabase
-          .from('placements')
-          .select('*')
-          .eq('status', 'active')
-          .order('created_at', { ascending: false });
-        
-        setPlacements(placementsData || []);
-      }
-      
-      setLoading(false);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      setLoading(false);
-    }
-  };
 
   const handleJoinEvent = async (eventId: string) => {
     try {
@@ -302,9 +331,9 @@ const StudentDashboard = () => {
     }
 
     return filtered.sort((a, b) => {
-      if (sortBy === "date-asc") return new Date(a.date_time).getTime() - new Date(b.date_time).getTime();
-      if (sortBy === "date-desc") return new Date(b.date_time).getTime() - new Date(a.date_time).getTime();
-      if (sortBy === "title") return a.title.localeCompare(b.title);
+      if (eventsSort === "date-asc") return new Date(a.date_time).getTime() - new Date(b.date_time).getTime();
+      if (eventsSort === "date-desc") return new Date(b.date_time).getTime() - new Date(a.date_time).getTime();
+      if (eventsSort === "title") return a.title.localeCompare(b.title);
       return 0;
     });
   };
@@ -316,8 +345,8 @@ const StudentDashboard = () => {
     );
 
     return filtered.sort((a, b) => {
-      if (sortBy === "name") return a.name.localeCompare(b.name);
-      if (sortBy === "members") {
+      if (clubsSort === "name") return a.name.localeCompare(b.name);
+      if (clubsSort === "members") {
         const aCount = a.club_memberships?.[0]?.count || 0;
         const bCount = b.club_memberships?.[0]?.count || 0;
         return bCount - aCount;
@@ -333,8 +362,8 @@ const StudentDashboard = () => {
     );
 
     return filtered.sort((a, b) => {
-      if (sortBy === "recent") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      if (sortBy === "company") return a.company_name.localeCompare(b.company_name);
+      if (placementsSort === "recent") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      if (placementsSort === "company") return a.company_name.localeCompare(b.company_name);
       return 0;
     });
   };
@@ -475,8 +504,8 @@ const StudentDashboard = () => {
               onSearchChange={setSearchTerm}
               filterType={filterType}
               onFilterChange={setFilterType}
-              sortBy={sortBy}
-              onSortChange={setSortBy}
+              sortBy={eventsSort}
+              onSortChange={setEventsSort}
               context="events"
             />
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -551,8 +580,8 @@ const StudentDashboard = () => {
               onSearchChange={setSearchTerm}
               filterType={filterType}
               onFilterChange={setFilterType}
-              sortBy={sortBy}
-              onSortChange={setSortBy}
+              sortBy={clubsSort}
+              onSortChange={setClubsSort}
               context="clubs"
             />
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -608,8 +637,8 @@ const StudentDashboard = () => {
                 onSearchChange={setSearchTerm}
                 filterType={filterType}
                 onFilterChange={setFilterType}
-                sortBy={sortBy}
-                onSortChange={setSortBy}
+                sortBy={placementsSort}
+                onSortChange={setPlacementsSort}
                 context="placements"
               />
               <div className="grid gap-4 md:grid-cols-2">

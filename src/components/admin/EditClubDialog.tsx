@@ -10,6 +10,7 @@ import { Plus, Trash, Edit, Save } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ImageUpload } from "@/components/ui/image-upload";
+import { MultiImageUpload } from "@/components/ui/multi-image-upload";
 
 import { Tables } from "@/integrations/supabase/types";
 
@@ -17,13 +18,23 @@ interface Activity {
   title: string;
   date: string;
   description: string;
-  image: string;
+  images: string[];
 }
 
 interface CustomField {
   label: string;
   value: string;
   image: string;
+}
+
+interface ClubDetails {
+  foundedBy?: string;
+  president?: string;
+  vicePresident?: string | string[];
+  secretary?: string | string[];
+  facultyInCharge?: string | string[];
+  activities?: Activity[];
+  customFields?: CustomField[];
 }
 
 interface EditClubDialogProps {
@@ -60,7 +71,11 @@ export const EditClubDialog = ({ club, onRefresh }: EditClubDialogProps) => {
           vicePresident: normalizeToArray(details.vicePresident),
           secretary: normalizeToArray(details.secretary),
           facultyInCharge: normalizeToArray(details.facultyInCharge),
-          activities: details.activities || [],
+          // Migration for activity images: ensure images array exists, populate from legacy image if needed
+          activities: (details.activities || []).map((a: any) => ({
+             ...a,
+             images: a.images || (a.image ? [a.image] : [])
+          })),
           customFields: details.customFields || []
         }
       });
@@ -125,7 +140,7 @@ export const EditClubDialog = ({ club, onRefresh }: EditClubDialogProps) => {
     }
   };
 
-  const handleActivityChange = (index: number, field: keyof Activity, value: string) => {
+  const handleActivityChange = (index: number, field: keyof Activity, value: any) => {
     const newActivities = [...formData.details.activities];
     newActivities[index] = { ...newActivities[index], [field]: value };
     setFormData(prev => ({
@@ -139,7 +154,7 @@ export const EditClubDialog = ({ club, onRefresh }: EditClubDialogProps) => {
       ...prev,
       details: {
         ...prev.details,
-        activities: [...prev.details.activities, { title: "", date: "", description: "", image: "" }]
+        activities: [...prev.details.activities, { title: "", date: "", description: "", images: [] }]
       }
     }));
   };
@@ -406,11 +421,12 @@ export const EditClubDialog = ({ club, onRefresh }: EditClubDialogProps) => {
                         onChange={(e) => handleActivityChange(index, 'description', e.target.value)} 
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label>Image</Label>
-                      <ImageUpload 
-                        value={activity.image || ""} 
-                        onChange={(url) => handleActivityChange(index, 'image', url)} 
+                    <div className="space-y-2 col-span-2">
+                      <Label>Images (Max 5)</Label>
+                      <MultiImageUpload 
+                        value={activity.images || []} 
+                        onChange={(urls) => handleActivityChange(index, 'images', urls)}
+                        maxFiles={5}
                       />
                     </div>
                   </div>

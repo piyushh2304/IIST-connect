@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Calendar, Briefcase, Users, Bell, LogOut, Plus, UserCircle, BarChart3, Wrench, FileText } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,14 @@ type StudentWithClubs = Tables<'students'>; // clubs are separate in this compon
 type Placement = Tables<'placements'>;
 type Club = Tables<'clubs'>;
 
+interface ClubDetails {
+  foundedBy?: string;
+  facultyInCharge?: string | string[];
+  president?: string;
+  vicePresident?: string | string[];
+  secretary?: string | string[];
+}
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Tables<'profiles'> | null>(null);
@@ -47,6 +56,7 @@ const AdminDashboard = () => {
     section: "all"
   });
   const [viewParticipantsEventId, setViewParticipantsEventId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("analytics");
 
   useEffect(() => {
     let mounted = true;
@@ -313,6 +323,15 @@ const AdminDashboard = () => {
           </h1>
           <div className="flex items-center gap-4">
             <span className="text-sm font-medium">{profile?.name}</span>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setActiveTab("tools")}
+              className={cn("flex items-center gap-2", activeTab === "tools" && "bg-accent/50 text-accent-foreground")}
+            >
+              <Wrench className="h-4 w-4" />
+              Tools
+            </Button>
             <Button variant="ghost" size="icon" onClick={handleLogout}>
               <LogOut className="h-5 w-5" />
             </Button>
@@ -322,7 +341,7 @@ const AdminDashboard = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        <Tabs defaultValue="analytics" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full max-w-5xl mx-auto grid-cols-7 gap-1">
             <TabsTrigger value="analytics">
               <BarChart3 className="h-4 w-4 mr-2" />
@@ -351,10 +370,6 @@ const AdminDashboard = () => {
             <TabsTrigger value="notes">
               <FileText className="h-4 w-4 mr-2" />
               Notes
-            </TabsTrigger>
-            <TabsTrigger value="tools">
-              <Wrench className="h-4 w-4 mr-2" />
-              Tools
             </TabsTrigger>
           </TabsList>
 
@@ -419,14 +434,16 @@ const AdminDashboard = () => {
               <CreateClubDialog onRefresh={fetchData} />
             </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {clubs.map((club) => (
+              {clubs.map((club) => {
+                const details = club.details as unknown as ClubDetails;
+                return (
                 <Card key={club.id} className="hover:shadow-lg transition-all duration-300">
                   <CardHeader className="flex flex-row items-start justify-between space-y-0 p-6">
                     <div className="space-y-1">
                       <CardTitle className="text-xl">{club.name}</CardTitle>
-                      {club.details?.foundedBy && (
+                      {details?.foundedBy && (
                         <p className="text-xs text-muted-foreground">
-                           Founded by {club.details.foundedBy}
+                           Founded by {details.foundedBy}
                         </p>
                       )}
                     </div>
@@ -437,49 +454,49 @@ const AdminDashboard = () => {
                     
                     {/* Leadership Info */}
                     <div className="pt-2 border-t text-sm space-y-1">
-                      {club.details?.facultyInCharge && (
+                      {details?.facultyInCharge && (
                         <div className="flex gap-2">
                            <span className="font-semibold min-w-24">Faculty:</span>
                            <span className="text-muted-foreground">
-                             {Array.isArray(club.details.facultyInCharge) 
-                               ? club.details.facultyInCharge.join(", ") 
-                               : club.details.facultyInCharge}
+                             {Array.isArray(details.facultyInCharge) 
+                               ? details.facultyInCharge.join(", ") 
+                               : details.facultyInCharge}
                            </span>
                         </div>
                       )}
                       
-                      {club.details?.president && (
+                      {details?.president && (
                         <div className="flex gap-2">
                           <span className="font-semibold min-w-24">President:</span>
-                          <span className="text-muted-foreground">{club.details.president}</span>
+                          <span className="text-muted-foreground">{details.president}</span>
                         </div>
                       )}
 
-                      {club.details?.vicePresident && (
+                      {details?.vicePresident && (
                         <div className="flex gap-2">
-                           <span className="font-semibold min-w-24">VP{Array.isArray(club.details.vicePresident) && club.details.vicePresident.length > 1 ? 's' : ''}:</span>
+                           <span className="font-semibold min-w-24">VP{Array.isArray(details.vicePresident) && details.vicePresident.length > 1 ? 's' : ''}:</span>
                            <span className="text-muted-foreground">
-                             {Array.isArray(club.details.vicePresident) 
-                               ? club.details.vicePresident.join(", ") 
-                               : club.details.vicePresident}
+                             {Array.isArray(details.vicePresident) 
+                               ? details.vicePresident.join(", ") 
+                               : details.vicePresident}
                            </span>
                         </div>
                       )}
 
-                      {club.details?.secretary && (
+                      {details?.secretary && (
                         <div className="flex gap-2">
-                           <span className="font-semibold min-w-24">Secretary{Array.isArray(club.details.secretary) && club.details.secretary.length > 1 ? 's' : ''}:</span>
+                           <span className="font-semibold min-w-24">Secretary{Array.isArray(details.secretary) && details.secretary.length > 1 ? 's' : ''}:</span>
                            <span className="text-muted-foreground">
-                             {Array.isArray(club.details.secretary) 
-                               ? club.details.secretary.join(", ") 
-                               : club.details.secretary}
+                             {Array.isArray(details.secretary) 
+                               ? details.secretary.join(", ") 
+                               : details.secretary}
                            </span>
                         </div>
                       )}
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+              )})}
             </div>
           </TabsContent>
 

@@ -16,6 +16,11 @@ Create a `.env` file in the root directory (or set these in your hosting provide
 ```env
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
+
+# Cloudinary Configuration
+VITE_CLOUDINARY_CLOUD_NAME=your_cloud_name
+VITE_CLOUDINARY_API_KEY=your_api_key
+VITE_CLOUDINARY_UPLOAD_PRESET=your_upload_preset
 ```
 
 ### 2. Build

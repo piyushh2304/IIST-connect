@@ -96,27 +96,36 @@ export const BulkStudentImport = ({ onImportComplete }: { onImportComplete: () =
         <CardDescription>Upload CSV file to import multiple students at once</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <Button variant="outline" onClick={downloadTemplate} className="gap-2">
             <Download className="h-4 w-4" />
             Download Template
           </Button>
           
-          <div className="relative">
+          <div className="flex items-center gap-2">
             <Input
               type="file"
               accept=".csv"
               onChange={handleFileUpload}
               disabled={importing}
-              className="cursor-pointer"
+              className="hidden"
               id="csv-upload"
             />
-            <label htmlFor="csv-upload" className="cursor-pointer">
-              <Button disabled={importing} className="gap-2 pointer-events-none">
-                <Upload className="h-4 w-4" />
-                {importing ? 'Importing...' : 'Upload CSV'}
+            <label htmlFor="csv-upload">
+              <Button 
+                disabled={importing} 
+                className="gap-2 cursor-pointer" 
+                asChild
+              >
+                <span>
+                  <Upload className="h-4 w-4" />
+                  {importing ? 'Importing...' : 'Upload CSV'}
+                </span>
               </Button>
             </label>
+            <span className="text-sm text-muted-foreground italic">
+              (Upload a .csv file)
+            </span>
           </div>
         </div>
 
