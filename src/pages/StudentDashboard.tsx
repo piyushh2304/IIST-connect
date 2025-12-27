@@ -207,6 +207,10 @@ const StudentDashboard = () => {
       }
     });
 
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, [fetchData]);
 
