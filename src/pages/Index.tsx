@@ -33,7 +33,7 @@ const Index = () => {
               <GraduationCap className="mr-2 h-5 w-5 group-hover:rotate-12 transition-transform" />
               Student Portal
             </Button>
-{/* <Button
+            <Button
               size="lg"
               variant="outline"
               onClick={() => navigate("/admin/auth")}
@@ -41,7 +41,7 @@ const Index = () => {
             >
               <Shield className="mr-2 h-5 w-5 group-hover:rotate-12 transition-transform" />
               Admin Portal
-            </Button> */}
+            </Button>
           </div>
         </div>
       </section>
