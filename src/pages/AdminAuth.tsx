@@ -81,8 +81,14 @@ const AdminAuth = () => {
 
         if (error) throw error;
         
-        toast.success("Admin account created successfully!");
-        navigate("/admin/dashboard");
+        if (data?.session) {
+          toast.success("Admin account created successfully!");
+          navigate("/admin/dashboard");
+        } else {
+          toast.success("Admin registration successful! Please check your email for a confirmation link to activate your account.");
+          setIsLogin(true);
+          setFormData(prev => ({ ...prev, password: "" }));
+        }
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "An error occurred");

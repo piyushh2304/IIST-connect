@@ -262,7 +262,7 @@ BEGIN
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'role', 'student'),
     NEW.raw_user_meta_data->>'college_id',
-    COALESCE((NEW.raw_user_meta_data->>'semester')::INTEGER, 1),
+    COALESCE(NULLIF(NEW.raw_user_meta_data->>'semester', '')::INTEGER, 1),
     NEW.raw_user_meta_data->>'branch',
     NEW.raw_user_meta_data->>'section'
   );
@@ -287,9 +287,9 @@ BEGIN
           NEW.email,
           NEW.raw_user_meta_data->>'college_id',
           NEW.raw_user_meta_data->>'phone_number',
-          (NEW.raw_user_meta_data->>'date_of_birth')::DATE,
-          COALESCE((NEW.raw_user_meta_data->>'semester')::INTEGER, 1),
-          COALESCE((NEW.raw_user_meta_data->>'year')::INTEGER, 1),
+          NULLIF(NEW.raw_user_meta_data->>'date_of_birth', '')::DATE,
+          COALESCE(NULLIF(NEW.raw_user_meta_data->>'semester', '')::INTEGER, 1),
+          COALESCE(NULLIF(NEW.raw_user_meta_data->>'year', '')::INTEGER, 1),
           NEW.raw_user_meta_data->>'branch',
           NEW.raw_user_meta_data->>'section'
       );
@@ -314,7 +314,26 @@ BEGIN
 END;
 $$;
 
--- CREATE TRIGGER
+-- Function and trigger to auto-confirm email BEFORE insert to avoid RLS/locking issues
+CREATE OR REPLACE FUNCTION public.auto_confirm_email()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  NEW.email_confirmed_at = COALESCE(NEW.email_confirmed_at, NOW());
+  NEW.confirmed_at = COALESCE(NEW.confirmed_at, NOW());
+  RETURN NEW;
+END;
+$$;
+
+-- CREATE BEFORE TRIGGER
+CREATE TRIGGER on_auth_user_created_before
+  BEFORE INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.auto_confirm_email();
+
+-- CREATE AFTER TRIGGER (for creating profiles and role-specific records)
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
@@ -336,7 +355,7 @@ BEGIN
             user_rec.email,
             COALESCE(user_rec.raw_user_meta_data->>'role', 'student'),
             user_rec.raw_user_meta_data->>'college_id',
-            COALESCE((user_rec.raw_user_meta_data->>'semester')::INTEGER, 1),
+            COALESCE(NULLIF(user_rec.raw_user_meta_data->>'semester', '')::INTEGER, 1),
             user_rec.raw_user_meta_data->>'branch',
             user_rec.raw_user_meta_data->>'section'
         ) ON CONFLICT (id) DO NOTHING;
@@ -351,9 +370,9 @@ BEGIN
                 user_rec.email,
                 user_rec.raw_user_meta_data->>'college_id',
                 user_rec.raw_user_meta_data->>'phone_number',
-                (user_rec.raw_user_meta_data->>'date_of_birth')::DATE,
-                COALESCE((user_rec.raw_user_meta_data->>'semester')::INTEGER, 1),
-                COALESCE((user_rec.raw_user_meta_data->>'year')::INTEGER, 1),
+                NULLIF(user_rec.raw_user_meta_data->>'date_of_birth', '')::DATE,
+                COALESCE(NULLIF(user_rec.raw_user_meta_data->>'semester', '')::INTEGER, 1),
+                COALESCE(NULLIF(user_rec.raw_user_meta_data->>'year', '')::INTEGER, 1),
                 user_rec.raw_user_meta_data->>'branch',
                 user_rec.raw_user_meta_data->>'section'
             ) ON CONFLICT (id) DO NOTHING;

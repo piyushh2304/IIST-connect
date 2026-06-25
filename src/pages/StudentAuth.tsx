@@ -78,8 +78,14 @@ const StudentAuth = () => {
 
         if (error) throw error;
         
-        toast.success("Account created successfully!");
-        navigate("/student/dashboard");
+        if (data?.session) {
+          toast.success("Account created successfully!");
+          navigate("/student/dashboard");
+        } else {
+          toast.success("Registration successful! Please check your email for a confirmation link to activate your account.");
+          setIsLogin(true);
+          setFormData(prev => ({ ...prev, password: "" }));
+        }
       }
     } catch (error: any) {
       toast.error(error.message || "An error occurred");
